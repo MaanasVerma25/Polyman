@@ -20,7 +20,7 @@ import { AgentRoster } from './components/agents/AgentRoster';
 import { SettingsModal } from './components/settings/SettingsModal';
 import type { DAGNode, AgentLog, Run } from './types';
 
-const API_BASE = 'http://127.0.0.1:8000';
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://127.0.0.1:8000';
 
 export function App() {
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {

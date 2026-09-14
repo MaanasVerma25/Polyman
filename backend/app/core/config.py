@@ -11,9 +11,9 @@ class Settings(BaseModel):
     app_version: str = "1.0.0"
     debug: bool = True
     
-    # Workspace & Storage
-    workspace_dir: str = str(WORKSPACE_DIR)
-    db_path: str = str(BACKEND_DIR / "polyman.db")
+    # Workspace & Storage (override via env for production deployments)
+    workspace_dir: str = Field(default_factory=lambda: os.getenv("WORKSPACE_DIR", str(WORKSPACE_DIR)))
+    db_path: str = Field(default_factory=lambda: os.getenv("DB_PATH", str(BACKEND_DIR / "polyman.db")))
     
     # LLM Settings (Stored in memory / config or overridden via DB/UI)
     openai_api_key: str = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY", ""))
