@@ -3,9 +3,9 @@ import json
 import logging
 import uuid
 from typing import Dict, Any, List, Optional
-import aiosqlite
 from ..core.config import settings
 from ..core.events import event_manager
+from ..core.database import db_create_run, db_update_run, db_insert_dag_nodes
 from ..engine.llm import llm_gateway
 from .dag import DAGExecutor
 
@@ -54,12 +54,13 @@ class Orchestrator:
         logger.info(f"Initiating run {run_id} for prompt: {task_prompt[:60]} in {project_path}")
 
         # 1. Create run record in DB
-        async with aiosqlite.connect(settings.db_path) as db:
-            await db.execute("""
-                INSERT INTO runs (id, project_id, task_prompt, status, summary)
-                VALUES (?, ?, ?, 'pending', 'Analyzing requirements and generating DAG...')
-            """, (run_id, project_path, task_prompt))
-            await db.commit()
+        await db_create_run(
+            run_id=run_id,
+            project_id=project_path,
+            task_prompt=task_prompt,
+            summary='Analyzing requirements and generating DAG...',
+            status='pending'
+        )
 
         # 2. Decompose task into DAG nodes using Orchestrator LLM
         dag_data = await self._decompose_task(task_prompt, selected_agents)
@@ -79,15 +80,8 @@ class Orchestrator:
             node["dependencies"] = [id_map.get(d, d) for d in node.get("dependencies", [])]
 
         # 3. Persist DAG nodes to DB
-        async with aiosqlite.connect(settings.db_path) as db:
-            await db.execute("UPDATE runs SET summary = ?, status = 'running' WHERE id = ?", (summary, run_id))
-            for node in nodes:
-                deps_json = json.dumps(node.get("dependencies", []))
-                await db.execute("""
-                    INSERT INTO dag_nodes (id, run_id, agent_role, title, description, status, dependencies)
-                    VALUES (?, ?, ?, ?, ?, 'pending', ?)
-                """, (node["id"], run_id, node["agent_role"], node["title"], node.get("description", ""), deps_json))
-            await db.commit()
+        await db_update_run(run_id=run_id, summary=summary, status='running')
+        await db_insert_dag_nodes(run_id=run_id, nodes=nodes)
 
         # 4. Broadcast DAG creation
         await event_manager.broadcast(run_id, "DAG_CREATED", {

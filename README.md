@@ -171,8 +171,8 @@ Polyman operates as a **self-orchestrating multi-agent system**. You provide a n
 
 - **Monorepo with clear backend/frontend boundary** — no shared runtime coupling
 - **Async-first Python backend** — all I/O (LLM calls, DB, filesystem, shell) is non-blocking via `asyncio`
-- **WebSocket event bus** — the `EventManager` multiplexes per-run streams so the frontend receives targeted real-time updates
-- **SQLite with WAL mode** — zero-config persistence with ACID guarantees; no external database required
+- **WebSocket & Realtime event bus** — live terminal streams and DAG transitions powered by Supabase Realtime in production and local WebSocket in development
+- **Supabase PostgreSQL & SQLite dual-mode** — zero-maintenance cloud database with live channel replication, with seamless local offline SQLite fallback
 - **Graceful degradation** — if no API keys are configured, the built-in domain fallback generator produces realistic outputs for every agent role
 
 ---
@@ -874,6 +874,53 @@ Polyman persists all execution state in a local **SQLite** database (`backend/po
 │  └─────────────┘                                               │
 └──────────────────────────────────────────────────────────────────┘
 ```
+
+---
+
+## 🚀 Deploy to Vercel & Supabase in 2 Minutes
+
+Polyman is engineered for effortless serverless deployment on **Vercel** with **Supabase** managing PostgreSQL persistence and Realtime live streaming.
+
+```
+┌───────────────────────────┐         ┌───────────────────────────┐
+│     Vercel Deployment     │         │      Supabase Cloud       │
+│  ┌─────────────────────┐  │         │  ┌─────────────────────┐  │
+│  │ React + Vite Static │  │         │  │ PostgreSQL Database │  │
+│  │ Edge CDN Frontend   │  │         │  │ runs, nodes, logs   │  │
+│  └──────────┬──────────┘  │         │  └──────────┬──────────┘  │
+│             │             │         │             │             │
+│  ┌──────────▼──────────┐  │ REST    │  ┌──────────▼──────────┐  │
+│  │ Python Serverless   ├──┼─────────┼─►│ Supabase Realtime   │  │
+│  │ FastAPI /api/*      │  │         │  │ WebSocket streaming │  │
+│  └─────────────────────┘  │         │  └─────────────────────┘  │
+└───────────────────────────┘         └───────────────────────────┘
+```
+
+### Step 1: Set Up Supabase (Free)
+1. Create a free project at [supabase.com](https://supabase.com).
+2. Navigate to **SQL Editor** in your Supabase dashboard.
+3. Open [`supabase/schema.sql`](supabase/schema.sql) in this repository, paste the SQL statements, and click **Run**.
+   - This provisions all schema tables (`runs`, `dag_nodes`, `agent_logs`, `custom_agents`, `reports`, `app_settings`), seeds the 6 autonomous agents, and activates Realtime event streaming.
+4. Go to **Project Settings → API** and copy your **Project URL**, **anon / public key**, and **service_role key**.
+
+### Step 2: Deploy to Vercel
+1. Fork or push this repository to your GitHub account.
+2. In [vercel.com](https://vercel.com), click **"Add New..." → "Project"** and import your repository.
+3. Add the following **Environment Variables** in the Vercel project settings:
+
+| Variable | Required | Description |
+|:---|:---|:---|
+| `SUPABASE_URL` | **Yes** | Your Supabase Project URL (`https://<project-ref>.supabase.co`) |
+| `SUPABASE_SERVICE_ROLE_KEY` | **Yes** | Supabase Service Role Key (used securely by the serverless backend) |
+| `VITE_SUPABASE_URL` | **Yes** | Supabase Project URL (exposed to browser for Realtime event channels) |
+| `VITE_SUPABASE_ANON_KEY` | **Yes** | Supabase Anon Public Key (used by frontend browser client) |
+| `GEMINI_API_KEY` | Recommended | Google Gemini API Key for Orchestrator, Architect, Auditor |
+| `OPENAI_API_KEY` | Optional | OpenAI Key for Legal Counsel and Financial Accountant |
+| `ANTHROPIC_API_KEY` | Optional | Anthropic Key for Software Engineer (SDE) |
+
+4. Click **Deploy**!
+   - Vercel automatically builds the frontend static bundle and configures `/api/*` serverless Python functions via [`vercel.json`](vercel.json) and [`api/index.py`](api/index.py).
+   - Your live Polyman platform will be available at your custom `*.vercel.app` URL immediately.
 
 ---
 

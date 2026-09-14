@@ -1,9 +1,9 @@
 import json
 import logging
 from typing import Dict, Any, Optional
-import aiosqlite
 from ..core.config import settings
 from ..core.events import event_manager
+from ..core.database import db_insert_agent_log
 from ..engine.llm import llm_gateway
 
 logger = logging.getLogger("polyman.agent")
@@ -28,7 +28,7 @@ class BaseAgent:
         self.color = color
 
     async def log_event(self, run_id: str, node_id: Optional[str], event_type: str, content: str):
-        # Broadcast via WebSocket
+        # Broadcast via WebSocket (for local dev)
         await event_manager.broadcast(run_id, f"AGENT_{event_type.upper()}", {
             "node_id": node_id,
             "agent_role": self.role,
@@ -37,14 +37,15 @@ class BaseAgent:
             "content": content
         })
 
-        # Save to database
+        # Save to database (triggers Supabase Realtime automatically in production)
         try:
-            async with aiosqlite.connect(settings.db_path) as db:
-                await db.execute("""
-                    INSERT INTO agent_logs (run_id, node_id, agent_role, event_type, content)
-                    VALUES (?, ?, ?, ?, ?)
-                """, (run_id, node_id, self.role, event_type, content))
-                await db.commit()
+            await db_insert_agent_log(
+                run_id=run_id,
+                node_id=node_id,
+                agent_role=self.role,
+                event_type=event_type,
+                content=content
+            )
         except Exception as e:
             logger.error(f"Failed to persist agent log: {e}")
 

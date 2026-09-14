@@ -15,6 +15,10 @@ class Settings(BaseModel):
     workspace_dir: str = Field(default_factory=lambda: os.getenv("WORKSPACE_DIR", str(WORKSPACE_DIR)))
     db_path: str = Field(default_factory=lambda: os.getenv("DB_PATH", str(BACKEND_DIR / "polyman.db")))
     
+    # Supabase Configuration
+    supabase_url: str = Field(default_factory=lambda: os.getenv("SUPABASE_URL", ""))
+    supabase_key: str = Field(default_factory=lambda: os.getenv("SUPABASE_SERVICE_ROLE_KEY", os.getenv("SUPABASE_KEY", "")))
+
     # LLM Settings (Stored in memory / config or overridden via DB/UI)
     openai_api_key: str = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY", ""))
     anthropic_api_key: str = Field(default_factory=lambda: os.getenv("ANTHROPIC_API_KEY", ""))

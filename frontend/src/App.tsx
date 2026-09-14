@@ -18,14 +18,12 @@ import { WorkspaceExplorer } from './components/workspace/WorkspaceExplorer';
 import { ReportsViewer } from './components/reports/ReportsViewer';
 import { AgentRoster } from './components/agents/AgentRoster';
 import { SettingsModal } from './components/settings/SettingsModal';
+import { supabase, isSupabaseConfigured } from './lib/supabase';
 import type { DAGNode, AgentLog, Run } from './types';
 
-const API_BASE = import.meta.env.VITE_API_BASE || (
-  window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-    ? 'http://127.0.0.1:8000'
-    : window.location.origin
-);
-const WS_BASE = API_BASE.replace(/^http/, 'ws');
+const API_BASE = import.meta.env.VITE_API_BASE !== undefined
+  ? import.meta.env.VITE_API_BASE
+  : (import.meta.env.DEV ? 'http://127.0.0.1:8000' : '');
 
 export function App() {
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
@@ -90,55 +88,160 @@ export function App() {
     }
   };
 
-  // Connect WebSocket when an active run starts
+  // Connect Realtime (Supabase Realtime in production, WebSocket in local dev)
   useEffect(() => {
     if (!activeRun?.id) return;
 
-    const wsUrl = `${WS_BASE}/api/runs/ws/${activeRun.id}`;
-    const ws = new WebSocket(wsUrl);
-    wsRef.current = ws;
-
-    ws.onmessage = (event) => {
-      try {
-        const msg = JSON.parse(event.data);
-        const { type, data } = msg;
-
-        if (type === 'DAG_CREATED') {
-          setDagNodes(data.nodes || []);
-        } else if (type === 'NODE_STARTED') {
-          setDagNodes(prev => prev.map(n => n.id === data.node_id ? { ...n, status: 'running' } : n));
-        } else if (type === 'NODE_COMPLETED') {
-          setDagNodes(prev => prev.map(n => n.id === data.node_id ? { ...n, status: 'completed', output_data: data.output } : n));
-        } else if (type === 'NODE_FAILED') {
-          setDagNodes(prev => prev.map(n => n.id === data.node_id ? { ...n, status: 'failed' } : n));
-        } else if (type.startsWith('AGENT_')) {
-          setLogs(prev => [
-            ...prev,
-            {
-              id: Date.now() + Math.random(),
-              run_id: activeRun.id,
-              node_id: data.node_id,
-              agent_role: data.agent_role,
-              event_type: data.event_type,
-              content: data.content,
-              created_at: new Date().toISOString()
+    // 1. If Supabase is configured, use Supabase Realtime Channels
+    if (isSupabaseConfigured && supabase) {
+      const channel = supabase
+        .channel(`run-channel-${activeRun.id}`)
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'agent_logs', filter: `run_id=eq.${activeRun.id}` },
+          (payload) => {
+            const row = payload.new as any;
+            setLogs(prev => [
+              ...prev,
+              {
+                id: row.id,
+                run_id: row.run_id,
+                node_id: row.node_id,
+                agent_role: row.agent_role,
+                event_type: row.event_type,
+                content: row.content,
+                created_at: row.created_at
+              }
+            ]);
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'dag_nodes', filter: `run_id=eq.${activeRun.id}` },
+          (payload) => {
+            const row = payload.new as any;
+            setDagNodes(prev => prev.map(n => n.id === row.id ? {
+              ...n,
+              status: row.status,
+              output_data: typeof row.output_data === 'string' ? JSON.parse(row.output_data) : row.output_data
+            } : n));
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'runs', filter: `id=eq.${activeRun.id}` },
+          (payload) => {
+            const row = payload.new as any;
+            if (row.status === 'completed' || row.status === 'failed' || row.status === 'cancelled') {
+              setIsRunning(false);
+              fetchRecentRuns();
+            } else if (row.status === 'paused') {
+              setIsPaused(true);
+            } else if (row.status === 'running') {
+              setIsPaused(false);
             }
-          ]);
-        } else if (type === 'RUN_COMPLETED') {
-          setIsRunning(false);
-          fetchRecentRuns();
-        } else if (type === 'RUN_PAUSED') {
-          setIsPaused(true);
-        } else if (type === 'RUN_RESUMED') {
-          setIsPaused(false);
+          }
+        )
+        .subscribe();
+
+      // Poll periodically as safety net to refresh full status
+      const pollInterval = setInterval(async () => {
+        try {
+          const res = await fetch(`${API_BASE}/api/runs/${activeRun.id}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.nodes) setDagNodes(data.nodes);
+            if (data.logs) setLogs(data.logs);
+            if (data.status === 'completed' || data.status === 'failed' || data.status === 'cancelled') {
+              setIsRunning(false);
+              clearInterval(pollInterval);
+              fetchRecentRuns();
+            }
+          }
+        } catch {}
+      }, 3000);
+
+      const sb = supabase;
+      return () => {
+        if (sb) {
+          sb.removeChannel(channel);
         }
-      } catch (err) {
-        console.error('WS parse error:', err);
-      }
-    };
+        clearInterval(pollInterval);
+      };
+    }
+
+    // 2. Fallback: Local dev WebSocket
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const host = API_BASE ? API_BASE.replace(/^https?:\/\//, '') : window.location.host;
+    const wsUrl = `${protocol}//${host}/api/runs/ws/${activeRun.id}`;
+    
+    let ws: WebSocket | null = null;
+    try {
+      ws = new WebSocket(wsUrl);
+      wsRef.current = ws;
+
+      ws.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          const { type, data } = msg;
+
+          if (type === 'DAG_CREATED') {
+            setDagNodes(data.nodes || []);
+          } else if (type === 'NODE_STARTED') {
+            setDagNodes(prev => prev.map(n => n.id === data.node_id ? { ...n, status: 'running' } : n));
+          } else if (type === 'NODE_COMPLETED') {
+            setDagNodes(prev => prev.map(n => n.id === data.node_id ? { ...n, status: 'completed', output_data: data.output } : n));
+          } else if (type === 'NODE_FAILED') {
+            setDagNodes(prev => prev.map(n => n.id === data.node_id ? { ...n, status: 'failed' } : n));
+          } else if (type.startsWith('AGENT_')) {
+            setLogs(prev => [
+              ...prev,
+              {
+                id: Date.now() + Math.random(),
+                run_id: activeRun.id,
+                node_id: data.node_id,
+                agent_role: data.agent_role,
+                event_type: data.event_type,
+                content: data.content,
+                created_at: new Date().toISOString()
+              }
+            ]);
+          } else if (type === 'RUN_COMPLETED') {
+            setIsRunning(false);
+            fetchRecentRuns();
+          } else if (type === 'RUN_PAUSED') {
+            setIsPaused(true);
+          } else if (type === 'RUN_RESUMED') {
+            setIsPaused(false);
+          }
+        } catch (err) {
+          console.error('WS parse error:', err);
+        }
+      };
+    } catch (e) {
+      console.warn('Could not establish WebSocket connection, fallback polling enabled:', e);
+    }
+
+    // Safety polling interval
+    const pollInterval = setInterval(async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/runs/${activeRun.id}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.nodes) setDagNodes(data.nodes);
+          if (data.logs) setLogs(data.logs);
+          if (data.status === 'completed' || data.status === 'failed' || data.status === 'cancelled') {
+            setIsRunning(false);
+            clearInterval(pollInterval);
+            fetchRecentRuns();
+          }
+        }
+      } catch {}
+    }, 3000);
 
     return () => {
-      ws.close();
+      if (ws) ws.close();
+      clearInterval(pollInterval);
     };
   }, [activeRun?.id]);
 

@@ -2,9 +2,9 @@ import asyncio
 import json
 import logging
 from typing import Dict, Any, List, Optional
-import aiosqlite
 from ..core.config import settings
 from ..core.events import event_manager
+from ..core.database import db_update_dag_node, db_update_run
 from ..agents import get_agent_for_role
 
 logger = logging.getLogger("polyman.engine.dag")
@@ -153,27 +153,12 @@ class DAGExecutor:
 
     async def _update_node_status(self, node_id: str, status: str, output: Optional[Dict] = None):
         try:
-            async with aiosqlite.connect(settings.db_path) as db:
-                out_str = json.dumps(output) if output else None
-                await db.execute("""
-                    UPDATE dag_nodes
-                    SET status = ?, output_data = COALESCE(?, output_data),
-                        completed_at = CASE WHEN ? IN ('completed', 'failed', 'skipped') THEN CURRENT_TIMESTAMP ELSE completed_at END,
-                        started_at = CASE WHEN ? = 'running' THEN CURRENT_TIMESTAMP ELSE started_at END
-                    WHERE id = ?
-                """, (status, out_str, status, status, node_id))
-                await db.commit()
+            await db_update_dag_node(node_id=node_id, status=status, output=output)
         except Exception as e:
             logger.error(f"Failed to update node status: {e}")
 
     async def _update_run_status(self, status: str):
         try:
-            async with aiosqlite.connect(settings.db_path) as db:
-                await db.execute("""
-                    UPDATE runs
-                    SET status = ?, updated_at = CURRENT_TIMESTAMP
-                    WHERE id = ?
-                """, (status, self.run_id))
-                await db.commit()
+            await db_update_run(run_id=self.run_id, status=status)
         except Exception as e:
             logger.error(f"Failed to update run status: {e}")

@@ -2,9 +2,9 @@ import json
 import logging
 from typing import List, Optional
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
-import aiosqlite
 from ..core.config import settings
 from ..core.events import event_manager
+from ..core.database import db_get_runs, db_get_run_detail
 from ..engine.orchestrator import orchestrator, ACTIVE_EXECUTORS
 from ..models.run import RunCreate, RunResponse, DAGNodeResponse, AgentLogResponse
 
@@ -22,48 +22,14 @@ async def create_run(req: RunCreate):
 
 @router.get("", response_model=List[dict])
 async def list_runs(limit: int = 20):
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
-        async with db.execute(
-            "SELECT * FROM runs ORDER BY created_at DESC LIMIT ?", (limit,)
-        ) as cursor:
-            rows = await cursor.fetchall()
-            return [dict(r) for r in rows]
+    return await db_get_runs(limit=limit)
 
 @router.get("/{run_id}", response_model=dict)
 async def get_run(run_id: str):
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = aiosqlite.Row
-        
-        # Fetch run
-        async with db.execute("SELECT * FROM runs WHERE id = ?", (run_id,)) as cursor:
-            run_row = await cursor.fetchone()
-            if not run_row:
-                raise HTTPException(status_code=404, detail="Run not found")
-            run_data = dict(run_row)
-
-        # Fetch nodes
-        async with db.execute(
-            "SELECT * FROM dag_nodes WHERE run_id = ? ORDER BY started_at ASC, id ASC", (run_id,)
-        ) as cursor:
-            node_rows = await cursor.fetchall()
-            nodes = []
-            for n in node_rows:
-                nd = dict(n)
-                nd["dependencies"] = json.loads(nd["dependencies"]) if nd["dependencies"] else []
-                nd["input_data"] = json.loads(nd["input_data"]) if nd["input_data"] else None
-                nd["output_data"] = json.loads(nd["output_data"]) if nd["output_data"] else None
-                nodes.append(nd)
-            run_data["nodes"] = nodes
-
-        # Fetch logs
-        async with db.execute(
-            "SELECT * FROM agent_logs WHERE run_id = ? ORDER BY id ASC", (run_id,)
-        ) as cursor:
-            log_rows = await cursor.fetchall()
-            run_data["logs"] = [dict(l) for l in log_rows]
-
-        return run_data
+    run_data = await db_get_run_detail(run_id)
+    if not run_data:
+        raise HTTPException(status_code=404, detail="Run not found")
+    return run_data
 
 @router.post("/{run_id}/pause")
 async def pause_run(run_id: str):
