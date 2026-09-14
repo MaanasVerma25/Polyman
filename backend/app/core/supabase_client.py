@@ -11,13 +11,13 @@ def get_supabase():
     if _supabase_client is not None:
         return _supabase_client
 
-    if not settings.supabase_url or not settings.supabase_key:
+    if not settings.clean_supabase_url or not settings.supabase_key:
         return None
 
     try:
         from supabase import create_client, Client
-        _supabase_client = create_client(settings.supabase_url, settings.supabase_key)
-        logger.info("Supabase client initialized successfully.")
+        _supabase_client = create_client(settings.clean_supabase_url, settings.supabase_key)
+        logger.info(f"Supabase client initialized successfully for: {settings.clean_supabase_url}")
         return _supabase_client
     except Exception as e:
         logger.error(f"Failed to initialize Supabase client: {e}")

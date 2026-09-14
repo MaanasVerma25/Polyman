@@ -6,6 +6,19 @@ from pydantic import BaseModel, Field
 WORKSPACE_DIR = Path(__file__).resolve().parent.parent.parent.parent
 BACKEND_DIR = Path(__file__).resolve().parent.parent.parent
 
+# Load local .env if present
+for possible_env in [BACKEND_DIR / ".env", WORKSPACE_DIR / ".env"]:
+    if possible_env.exists():
+        try:
+            with open(possible_env, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith("#") and "=" in line:
+                        k, v = line.split("=", 1)
+                        os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+        except Exception:
+            pass
+
 class Settings(BaseModel):
     app_name: str = "Polyman"
     app_version: str = "1.0.0"
@@ -18,6 +31,15 @@ class Settings(BaseModel):
     # Supabase Configuration
     supabase_url: str = Field(default_factory=lambda: os.getenv("SUPABASE_URL", ""))
     supabase_key: str = Field(default_factory=lambda: os.getenv("SUPABASE_SERVICE_ROLE_KEY", os.getenv("SUPABASE_KEY", "")))
+
+    @property
+    def clean_supabase_url(self) -> str:
+        url = (self.supabase_url or "").strip()
+        if not url:
+            return ""
+        if "/rest/v1" in url:
+            url = url.split("/rest/v1")[0]
+        return url.rstrip("/")
 
     # LLM Settings (Stored in memory / config or overridden via DB/UI)
     openai_api_key: str = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY", ""))
