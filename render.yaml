@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: polyman-api
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    plan: free
+
+  - type: web
+    name: polyman-web
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    plan: free
+    envVars:
+      - key: VITE_API_BASE
+        value: https://polyman-api.onrender.com
+        sync: false
+        # Replace with the actual API service URL if Render assigns a different name/URL.
+        # For a Blueprint-created service, use the API URL shown in the Render dashboard.

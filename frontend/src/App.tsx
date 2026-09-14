@@ -20,7 +20,12 @@ import { AgentRoster } from './components/agents/AgentRoster';
 import { SettingsModal } from './components/settings/SettingsModal';
 import type { DAGNode, AgentLog, Run } from './types';
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://127.0.0.1:8000';
+const API_BASE = import.meta.env.VITE_API_BASE || (
+  window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? 'http://127.0.0.1:8000'
+    : window.location.origin
+);
+const WS_BASE = API_BASE.replace(/^http/, 'ws');
 
 export function App() {
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
@@ -89,7 +94,7 @@ export function App() {
   useEffect(() => {
     if (!activeRun?.id) return;
 
-    const wsUrl = `ws://127.0.0.1:8000/api/runs/ws/${activeRun.id}`;
+    const wsUrl = `${WS_BASE}/api/runs/ws/${activeRun.id}`;
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
