@@ -63,14 +63,14 @@ class Settings(BaseModel):
     gemini_api_key: str = Field(default_factory=lambda: os.getenv("GEMINI_API_KEY", ""))
     ollama_base_url: str = Field(default_factory=lambda: os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"))
 
-    # Default model choices per agent
+    # Default model choices per agent (all configured to Gemini)
     agent_models: dict = {
-        "orchestrator": {"provider": "gemini", "model": "gemini-2.0-flash"},
-        "architect": {"provider": "gemini", "model": "gemini-2.0-flash"},
-        "sde": {"provider": "anthropic", "model": "claude-3-7-sonnet"},
-        "lawyer": {"provider": "openai", "model": "gpt-4o"},
-        "auditor": {"provider": "gemini", "model": "gemini-2.0-flash"},
-        "accountant": {"provider": "openai", "model": "gpt-4o-mini"}
+        "orchestrator": {"provider": "gemini", "model": "gemini-2.5-flash"},
+        "architect": {"provider": "gemini", "model": "gemini-2.5-flash"},
+        "sde": {"provider": "gemini", "model": "gemini-2.5-flash"},
+        "lawyer": {"provider": "gemini", "model": "gemini-2.5-flash"},
+        "auditor": {"provider": "gemini", "model": "gemini-2.5-flash"},
+        "accountant": {"provider": "gemini", "model": "gemini-2.5-flash"}
     }
 
 settings = Settings()

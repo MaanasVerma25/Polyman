@@ -18,7 +18,7 @@ class AuditorAgent(BaseAgent):
                 "validate architectural integrity, and enforce strict release gating standards."
             ),
             default_provider="gemini",
-            default_model="gemini-2.0-flash",
+            default_model="gemini-2.5-flash",
             avatar="ShieldCheck",
             color="#ef4444"
         )

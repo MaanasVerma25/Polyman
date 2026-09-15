@@ -24,8 +24,8 @@ class SDEAgent(BaseAgent):
                 '  "summary": "Brief summary of files created"\n'
                 "}"
             ),
-            default_provider="anthropic",
-            default_model="claude-3-7-sonnet",
+            default_provider="gemini",
+            default_model="gemini-2.5-flash",
             avatar="Code2",
             color="#10b981"
         )

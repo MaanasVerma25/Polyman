@@ -17,8 +17,8 @@ class LawyerAgent(BaseAgent):
                 "You assess open source dependency risks, GDPR/CCPA privacy guidelines, and "
                 "draft license attribution and commercial Terms of Service."
             ),
-            default_provider="openai",
-            default_model="gpt-4o",
+            default_provider="gemini",
+            default_model="gemini-2.5-flash",
             avatar="Scale",
             color="#f59e0b"
         )

@@ -18,7 +18,7 @@ class ArchitectAgent(BaseAgent):
                 "Always generate a thorough Architecture Decision Record (ADR) in Markdown."
             ),
             default_provider="gemini",
-            default_model="gemini-2.0-flash",
+            default_model="gemini-2.5-flash",
             avatar="Layers",
             color="#0ea5e9"
         )

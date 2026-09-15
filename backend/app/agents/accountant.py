@@ -15,8 +15,8 @@ class AccountantAgent(BaseAgent):
                 "You are a Cloud FinOps and Software Financial Accountant. You model server compute costs, "
                 "database storage tiers, API token consumption, operational margins, and unit economics."
             ),
-            default_provider="openai",
-            default_model="gpt-4o-mini",
+            default_provider="gemini",
+            default_model="gemini-2.5-flash",
             avatar="Calculator",
             color="#8b5cf6"
         )
