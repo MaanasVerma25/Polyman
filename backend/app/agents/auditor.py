@@ -17,8 +17,8 @@ class AuditorAgent(BaseAgent):
                 "OWASP Top 10 vulnerabilities (injections, broken auth, sensitive data exposure), "
                 "validate architectural integrity, and enforce strict release gating standards."
             ),
-            default_provider="gemini",
-            default_model="gemini-2.5-flash",
+            default_provider="groq",
+            default_model="groq/compound",
             avatar="ShieldCheck",
             color="#ef4444"
         )
@@ -48,7 +48,8 @@ class AuditorAgent(BaseAgent):
             system_prompt=self.system_prompt,
             user_prompt=prompt,
             provider=self.default_provider,
-            model=self.default_model
+            model=self.default_model,
+            agent_role=self.role
         )
 
         rep_meta = save_report(project_path, "audit", "security_audit_report.md", audit_report)

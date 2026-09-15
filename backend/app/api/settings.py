@@ -9,6 +9,9 @@ class SettingsUpdate(BaseModel):
     openai_api_key: Optional[str] = None
     anthropic_api_key: Optional[str] = None
     gemini_api_key: Optional[str] = None
+    gemini_api_keys: Optional[list] = None
+    gemini_agent_keys: Optional[Dict[str, str]] = None
+    groq_api_key: Optional[str] = None
     ollama_base_url: Optional[str] = None
     agent_models: Optional[Dict[str, Dict[str, str]]] = None
 
@@ -25,13 +28,18 @@ async def get_settings():
         "workspace_dir": settings.workspace_dir,
         "openai_configured": bool(settings.openai_api_key),
         "anthropic_configured": bool(settings.anthropic_api_key),
-        "gemini_configured": bool(settings.gemini_api_key),
+        "gemini_configured": bool(settings.gemini_api_key or settings.gemini_api_keys),
+        "groq_configured": bool(settings.groq_api_key),
         "ollama_base_url": settings.ollama_base_url,
         "keys_masked": {
             "openai": mask(settings.openai_api_key),
             "anthropic": mask(settings.anthropic_api_key),
             "gemini": mask(settings.gemini_api_key),
+            "groq": mask(settings.groq_api_key),
         },
+        "gemini_pool_count": len(settings.gemini_api_keys),
+        "gemini_pool_masked": [mask(k) for k in settings.gemini_api_keys],
+        "gemini_agent_keys": {role: mask(k) for role, k in settings.gemini_agent_keys.items()},
         "agent_models": settings.agent_models
     }
 
@@ -43,6 +51,14 @@ async def update_settings(payload: SettingsUpdate):
         settings.anthropic_api_key = payload.anthropic_api_key
     if payload.gemini_api_key is not None:
         settings.gemini_api_key = payload.gemini_api_key
+        if payload.gemini_api_key and payload.gemini_api_key not in settings.gemini_api_keys:
+            settings.gemini_api_keys.insert(0, payload.gemini_api_key)
+    if payload.gemini_api_keys is not None:
+        settings.gemini_api_keys = [k.strip() for k in payload.gemini_api_keys if k.strip()]
+    if payload.gemini_agent_keys is not None:
+        settings.gemini_agent_keys.update(payload.gemini_agent_keys)
+    if payload.groq_api_key is not None:
+        settings.groq_api_key = payload.groq_api_key
     if payload.ollama_base_url is not None:
         settings.ollama_base_url = payload.ollama_base_url
     if payload.agent_models is not None:

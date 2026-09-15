@@ -15,7 +15,7 @@ class BaseAgent:
         name: str,
         system_prompt: str,
         default_provider: str = "gemini",
-        default_model: str = "gemini-2.0-flash",
+        default_model: str = "gemini-2.5-flash",
         avatar: str = "Bot",
         color: str = "#6366f1"
     ):

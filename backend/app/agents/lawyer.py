@@ -43,7 +43,8 @@ class LawyerAgent(BaseAgent):
             system_prompt=self.system_prompt,
             user_prompt=prompt,
             provider=self.default_provider,
-            model=self.default_model
+            model=self.default_model,
+            agent_role=self.role
         )
 
         # Save legal audit report

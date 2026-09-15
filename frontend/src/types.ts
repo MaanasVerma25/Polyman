@@ -66,11 +66,16 @@ export interface SettingsData {
   openai_configured: boolean;
   anthropic_configured: boolean;
   gemini_configured: boolean;
+  groq_configured?: boolean;
   ollama_base_url: string;
   keys_masked: {
     openai: string;
     anthropic: string;
     gemini: string;
+    groq?: string;
   };
+  gemini_pool_count?: number;
+  gemini_pool_masked?: string[];
+  gemini_agent_keys?: Record<string, string>;
   agent_models: Record<string, { provider: string; model: string }>;
 }

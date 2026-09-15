@@ -17,8 +17,8 @@ class ArchitectAgent(BaseAgent):
                 "robust architectural blueprints, module boundaries, system topologies, and directory layouts. "
                 "Always generate a thorough Architecture Decision Record (ADR) in Markdown."
             ),
-            default_provider="gemini",
-            default_model="gemini-2.5-flash",
+            default_provider="groq",
+            default_model="groq/compound",
             avatar="Layers",
             color="#0ea5e9"
         )
@@ -44,7 +44,8 @@ class ArchitectAgent(BaseAgent):
             system_prompt=self.system_prompt,
             user_prompt=prompt,
             provider=self.default_provider,
-            model=self.default_model
+            model=self.default_model,
+            agent_role=self.role
         )
 
         await self.log_event(run_id, node_id, "thought", "Drafted system blueprint. Persisting to docs/architecture/ADR_system_design.md...")

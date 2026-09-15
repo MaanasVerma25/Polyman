@@ -41,7 +41,8 @@ class AccountantAgent(BaseAgent):
             system_prompt=self.system_prompt,
             user_prompt=prompt,
             provider=self.default_provider,
-            model=self.default_model
+            model=self.default_model,
+            agent_role=self.role
         )
 
         rep_meta = save_report(project_path, "financial", "cost_and_budget_model.md", cost_report)

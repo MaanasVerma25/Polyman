@@ -19,8 +19,12 @@ class Orchestrator:
     def __init__(self):
         self.system_prompt = (
             "You are the Chief Orchestrator for Polyman. Your responsibility is to analyze a project request, "
-            "determine which specialized agents are required (such as architect, sde, lawyer, auditor, accountant), "
+            "determine which specialized agents are required (architect, sde, lawyer, auditor, accountant), "
             "and generate a DAG (Directed Acyclic Graph) of tasks with dependencies.\n\n"
+            "PARALLEL EXECUTION DIRECTIVE: Polyman runs agents simultaneously using dedicated, separate API keys. "
+            "Whenever possible, maximize concurrency: decouple independent tasks so that SDE (code implementation), "
+            "Lawyer (licensing/privacy), and Accountant (FinOps cost model) execute concurrently in parallel "
+            "immediately once the Architect blueprint is ready, rather than running sequentially.\n\n"
             "Output strictly valid JSON in the following format:\n"
             "{\n"
             '  "plan_summary": "High level strategy overview",\n'
@@ -113,14 +117,14 @@ class Orchestrator:
             f"Analyze the following user task and create a multi-agent execution DAG.\n"
             f"TASK: {task_prompt}\n"
             f"{filter_hint}\n"
-            f"Ensure subagents include architect, sde, lawyer, auditor, accountant where relevant."
+            f"Ensure subagents include architect, sde, lawyer, auditor, accountant where relevant. "
+            f"Maximize parallel branches where tasks can run simultaneously."
         )
 
         response_text = await llm_gateway.generate_response(
             system_prompt=self.system_prompt,
             user_prompt=user_prompt,
-            provider="gemini",
-            model="gemini-2.5-flash"
+            agent_role="orchestrator"
         )
 
         try:
@@ -137,44 +141,50 @@ class Orchestrator:
         except Exception as e:
             logger.warning(f"Failed to parse orchestrator DAG JSON: {e}. Using standard enterprise pipeline.")
 
-        # Default fallback enterprise pipeline
+        # Default fallback enterprise pipeline with parallel SDE, Lawyer, and Accountant
+        arch_id = f"node-arch-{uuid.uuid4().hex[:4]}"
+        sde_id = f"node-sde-{uuid.uuid4().hex[:4]}"
+        lawyer_id = f"node-lawyer-{uuid.uuid4().hex[:4]}"
+        acc_id = f"node-acc-{uuid.uuid4().hex[:4]}"
+        audit_id = f"node-audit-{uuid.uuid4().hex[:4]}"
+
         return {
-            "plan_summary": f"Orchestrated 5-agent pipeline for '{task_prompt[:50]}...'",
+            "plan_summary": f"Orchestrated parallel 5-agent pipeline for '{task_prompt[:50]}...'",
             "nodes": [
                 {
-                    "id": f"node-arch-{uuid.uuid4().hex[:4]}",
+                    "id": arch_id,
                     "agent_role": "architect",
                     "title": "Architecture Blueprint & Specs",
                     "description": "Formulate component topology and ADR",
                     "dependencies": []
                 },
                 {
-                    "id": f"node-sde-{uuid.uuid4().hex[:4]}",
+                    "id": sde_id,
                     "agent_role": "sde",
                     "title": "Code Synthesis & Test Suite",
                     "description": "Scaffold and implement project files",
-                    "dependencies": [f"node-arch-{uuid.uuid4().hex[:4]}"]
+                    "dependencies": [arch_id]
                 },
                 {
-                    "id": f"node-lawyer-{uuid.uuid4().hex[:4]}",
+                    "id": lawyer_id,
                     "agent_role": "lawyer",
                     "title": "Legal & Licensing Review",
                     "description": "Assess OSS licenses and draft compliance docs",
-                    "dependencies": [f"node-arch-{uuid.uuid4().hex[:4]}"]
+                    "dependencies": [arch_id]
                 },
                 {
-                    "id": f"node-acc-{uuid.uuid4().hex[:4]}",
+                    "id": acc_id,
                     "agent_role": "accountant",
                     "title": "FinOps & Cloud Cost Model",
                     "description": "Project server compute and API token economics",
-                    "dependencies": [f"node-arch-{uuid.uuid4().hex[:4]}"]
+                    "dependencies": [arch_id]
                 },
                 {
-                    "id": f"node-audit-{uuid.uuid4().hex[:4]}",
+                    "id": audit_id,
                     "agent_role": "auditor",
                     "title": "Security Sweep & Quality Gating",
                     "description": "OWASP vulnerability scan and code validation",
-                    "dependencies": [f"node-sde-{uuid.uuid4().hex[:4]}", f"node-lawyer-{uuid.uuid4().hex[:4]}"]
+                    "dependencies": [sde_id, lawyer_id]
                 }
             ]
         }
