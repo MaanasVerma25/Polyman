@@ -21,11 +21,11 @@ export const LiveLogViewer: React.FC<LiveLogViewerProps> = ({ logs }) => {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [autoScroll, setAutoScroll] = useState<boolean>(true);
   const [copied, setCopied] = useState<boolean>(false);
-  const endRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (autoScroll) {
-      endRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (autoScroll && containerRef.current) {
+      containerRef.current.scrollTop = containerRef.current.scrollHeight;
     }
   }, [logs, autoScroll]);
 
@@ -211,15 +211,18 @@ export const LiveLogViewer: React.FC<LiveLogViewerProps> = ({ logs }) => {
       </div>
 
       {/* Terminal Body */}
-      <div style={{
-        flex: 1,
-        overflowY: 'auto',
-        padding: '16px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '8px',
-        backgroundColor: 'var(--bg-primary)'
-      }}>
+      <div
+        ref={containerRef}
+        style={{
+          flex: 1,
+          overflowY: 'auto',
+          padding: '16px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '8px',
+          backgroundColor: 'var(--bg-primary)'
+        }}
+      >
         {filteredLogs.length === 0 ? (
           <div style={{ margin: 'auto', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
             <Terminal size={28} style={{ opacity: 0.3, margin: '0 auto 8px auto' }} />
@@ -294,7 +297,6 @@ export const LiveLogViewer: React.FC<LiveLogViewerProps> = ({ logs }) => {
             );
           })
         )}
-        <div ref={endRef} />
       </div>
     </div>
   );
