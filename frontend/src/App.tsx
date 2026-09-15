@@ -273,6 +273,22 @@ export function App() {
         updated_at: new Date().toISOString()
       });
       setDagNodes(data.nodes || []);
+
+      // Trigger continuous execution worker (enables flawless execution on Vercel Serverless)
+      const triggerExecution = async (runId: string) => {
+        try {
+          const execRes = await fetch(`${API_BASE}/api/runs/${runId}/execute`, { method: 'POST' });
+          if (execRes.ok) {
+            const execData = await execRes.json();
+            if (execData.continue) {
+              triggerExecution(runId);
+            }
+          }
+        } catch (err) {
+          console.warn('Execution worker notification:', err);
+        }
+      };
+      triggerExecution(data.run_id);
     } catch (e) {
       console.error(e);
       setIsRunning(false);

@@ -6,6 +6,7 @@ from ..core.config import settings
 from ..core.events import event_manager
 from ..core.database import db_get_runs, db_get_run_detail
 from ..engine.orchestrator import orchestrator, ACTIVE_EXECUTORS
+from ..engine.dag import DAGExecutor
 from ..models.run import RunCreate, RunResponse, DAGNodeResponse, AgentLogResponse
 
 router = APIRouter(prefix="/api/runs", tags=["runs"])
@@ -30,6 +31,37 @@ async def get_run(run_id: str):
     if not run_data:
         raise HTTPException(status_code=404, detail="Run not found")
     return run_data
+
+@router.post("/{run_id}/execute")
+async def execute_run(run_id: str):
+    """
+    Execute pending DAG nodes for a run. Supports serverless slicing with a 45s safety budget.
+    """
+    run_data = await db_get_run_detail(run_id)
+    if not run_data:
+        raise HTTPException(status_code=404, detail="Run not found")
+
+    current_status = run_data.get("status")
+    if current_status in ("completed", "failed", "cancelled"):
+        return {"status": current_status, "continue": False}
+
+    nodes = run_data.get("nodes", [])
+    task_prompt = run_data.get("task_prompt", "")
+    project_path = run_data.get("project_id") or settings.workspace_dir
+
+    executor = ACTIVE_EXECUTORS.get(run_id)
+    if not executor:
+        executor = DAGExecutor(run_id, project_path)
+        ACTIVE_EXECUTORS[run_id] = executor
+
+    result = {"continue": False}
+    try:
+        result = await executor.execute_dag(nodes, task_prompt, max_duration=45.0)
+        return result
+    finally:
+        # If execution finished, remove from active executors
+        if not result.get("continue", False):
+            ACTIVE_EXECUTORS.pop(run_id, None)
 
 @router.post("/{run_id}/pause")
 async def pause_run(run_id: str):

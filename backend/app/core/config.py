@@ -19,14 +19,30 @@ for possible_env in [BACKEND_DIR / ".env", WORKSPACE_DIR / ".env"]:
         except Exception:
             pass
 
+def _default_workspace_dir() -> str:
+    env_dir = os.getenv("WORKSPACE_DIR")
+    if env_dir:
+        return env_dir
+    if os.getenv("VERCEL") or os.getenv("AWS_LAMBDA_FUNCTION_NAME"):
+        return "/tmp/workspace"
+    return str(WORKSPACE_DIR)
+
+def _default_db_path() -> str:
+    env_db = os.getenv("DB_PATH")
+    if env_db:
+        return env_db
+    if os.getenv("VERCEL") or os.getenv("AWS_LAMBDA_FUNCTION_NAME"):
+        return "/tmp/polyman.db"
+    return str(BACKEND_DIR / "polyman.db")
+
 class Settings(BaseModel):
     app_name: str = "Polyman"
     app_version: str = "1.0.0"
     debug: bool = True
     
     # Workspace & Storage (override via env for production deployments)
-    workspace_dir: str = Field(default_factory=lambda: os.getenv("WORKSPACE_DIR", str(WORKSPACE_DIR)))
-    db_path: str = Field(default_factory=lambda: os.getenv("DB_PATH", str(BACKEND_DIR / "polyman.db")))
+    workspace_dir: str = Field(default_factory=_default_workspace_dir)
+    db_path: str = Field(default_factory=_default_db_path)
     
     # Supabase Configuration
     supabase_url: str = Field(default_factory=lambda: os.getenv("SUPABASE_URL", ""))

@@ -115,6 +115,8 @@ export const AgentRoster: React.FC<AgentRosterProps> = ({ apiBase }) => {
       });
       const data = await res.json();
       setTestResponse(`Test mission launched successfully with run ID: ${data.run_id}. Head to Mission Control to observe the real-time execution!`);
+      // Trigger execution for serverless environments (Vercel)
+      fetch(`${apiBase}/api/runs/${data.run_id}/execute`, { method: 'POST' }).catch(() => {});
     } catch (e) {
       setTestResponse(`Execution error: ${e}`);
     } finally {

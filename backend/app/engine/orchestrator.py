@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import os
 import uuid
 from typing import Dict, Any, List, Optional
 from ..core.config import settings
@@ -90,10 +91,14 @@ class Orchestrator:
             "nodes": nodes
         })
 
-        # 5. Launch autonomous execution in background task
+        # 5. Launch autonomous execution
         executor = DAGExecutor(run_id, project_path)
         ACTIVE_EXECUTORS[run_id] = executor
-        asyncio.create_task(self._run_wrapper(executor, nodes, task_prompt))
+        # On Vercel serverless functions, background tasks die when the HTTP response completes.
+        # Execution is driven by client-directed chunking via POST /api/runs/{run_id}/execute.
+        # For non-serverless environments (local dev / persistent servers), launch background task.
+        if not os.getenv("VERCEL"):
+            asyncio.create_task(self._run_wrapper(executor, nodes, task_prompt))
 
         return {
             "run_id": run_id,
