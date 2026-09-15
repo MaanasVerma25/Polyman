@@ -1,13 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Folder, 
   FileCode, 
   GitBranch, 
-  RefreshCw,
-  Copy,
-  Check,
-  Search,
-  FileText
+  RefreshCw, 
+  Copy, 
+  Check, 
+  Search, 
+  FileText 
 } from 'lucide-react';
 import type { ProjectFile } from '../../types';
 
@@ -26,7 +26,7 @@ export const WorkspaceExplorer: React.FC<WorkspaceExplorerProps> = ({ apiBase })
   const [loading, setLoading] = useState<boolean>(false);
   const [copied, setCopied] = useState<boolean>(false);
 
-  const fetchFiles = async () => {
+  const fetchFiles = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch(`${apiBase}/api/projects/files`);
@@ -42,11 +42,11 @@ export const WorkspaceExplorer: React.FC<WorkspaceExplorerProps> = ({ apiBase })
     } finally {
       setLoading(false);
     }
-  };
+  }, [apiBase]);
 
   useEffect(() => {
     fetchFiles();
-  }, [apiBase]);
+  }, [fetchFiles]);
 
   const loadFileContent = async (path: string) => {
     setSelectedFile(path);
@@ -71,97 +71,99 @@ export const WorkspaceExplorer: React.FC<WorkspaceExplorerProps> = ({ apiBase })
   );
 
   return (
-    <div style={{
+    <div className="container" style={{
       display: 'grid',
-      gridTemplateColumns: '320px 1fr',
-      height: 'calc(100vh - 120px)',
-      gap: '20px',
-      padding: '20px 28px'
+      gridTemplateColumns: '300px 1fr',
+      height: 'calc(100vh - 100px)',
+      gap: '16px',
+      paddingTop: '20px',
+      paddingBottom: '20px'
     }}>
       {/* Sidebar: File Tree & Git Controls */}
-      <div style={{
-        backgroundColor: 'var(--bg-secondary)',
-        borderRadius: 'var(--radius)',
-        border: '1px solid var(--border-color)',
+      <div className="card" style={{
         display: 'flex',
         flexDirection: 'column',
-        overflow: 'hidden',
-        boxShadow: 'var(--shadow-sm)'
+        overflow: 'hidden'
       }}>
         <div style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '14px 18px',
-          borderBottom: '1px solid var(--border-color)',
-          backgroundColor: 'var(--bg-tertiary)'
+          padding: '12px 16px',
+          borderBottom: '1px solid var(--border)',
+          backgroundColor: 'var(--surface-muted)'
         }}>
-          <span style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>
+          <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--foreground)' }}>
             Code Studio Explorer
           </span>
           <button
             onClick={fetchFiles}
+            className="button-ghost"
+            style={{ width: '28px', height: '28px', padding: 0 }}
             title="Refresh Files"
-            style={{ color: 'var(--text-muted)' }}
           >
-            <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
+            <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
           </button>
         </div>
 
         {/* View Switcher: Files vs Git Diff */}
-        <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', padding: '6px', gap: '4px', backgroundColor: 'var(--bg-primary)' }}>
+        <div style={{ 
+          display: 'flex', 
+          borderBottom: '1px solid var(--border)', 
+          padding: '4px', 
+          gap: '4px', 
+          backgroundColor: 'var(--background-alternative)' 
+        }}>
           <button
             onClick={() => setActiveView('editor')}
+            className="button-ghost"
             style={{
               flex: 1,
-              padding: '6px 12px',
-              borderRadius: '6px',
-              fontSize: '12px',
-              fontWeight: activeView === 'editor' ? 700 : 500,
-              backgroundColor: activeView === 'editor' ? 'var(--bg-secondary)' : 'transparent',
-              color: activeView === 'editor' ? 'var(--accent-primary)' : 'var(--text-secondary)',
-              boxShadow: activeView === 'editor' ? 'var(--shadow-sm)' : 'none'
+              height: '28px',
+              padding: '0 8px',
+              fontSize: '11px',
+              fontWeight: activeView === 'editor' ? 600 : 500,
+              backgroundColor: activeView === 'editor' ? 'var(--surface)' : 'transparent',
+              color: activeView === 'editor' ? 'var(--foreground)' : 'var(--foreground-secondary)',
+              border: activeView === 'editor' ? '1px solid var(--border)' : '1px solid transparent'
             }}
           >
-            Workspace Files ({files.length})
+            Files ({files.length})
           </button>
           <button
             onClick={() => setActiveView('diff')}
+            className="button-ghost"
             style={{
               flex: 1,
-              padding: '6px 12px',
-              borderRadius: '6px',
-              fontSize: '12px',
-              fontWeight: activeView === 'diff' ? 700 : 500,
-              backgroundColor: activeView === 'diff' ? 'var(--bg-secondary)' : 'transparent',
-              color: activeView === 'diff' ? 'var(--accent-primary)' : 'var(--text-secondary)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '6px',
-              boxShadow: activeView === 'diff' ? 'var(--shadow-sm)' : 'none'
+              height: '28px',
+              padding: '0 8px',
+              fontSize: '11px',
+              fontWeight: activeView === 'diff' ? 600 : 500,
+              backgroundColor: activeView === 'diff' ? 'var(--surface)' : 'transparent',
+              color: activeView === 'diff' ? 'var(--foreground)' : 'var(--foreground-secondary)',
+              border: activeView === 'diff' ? '1px solid var(--border)' : '1px solid transparent'
             }}
           >
-            <GitBranch size={13} />
-            Git Working Tree
+            <GitBranch size={12} />
+            <span>Git Tree</span>
           </button>
         </div>
 
         {/* Search input */}
-        <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-color)' }}>
+        <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)' }}>
           <div style={{
             display: 'flex',
             alignItems: 'center',
             gap: '6px',
-            backgroundColor: 'var(--bg-primary)',
-            borderRadius: '6px',
-            padding: '6px 10px',
-            border: '1px solid var(--border-color)'
+            backgroundColor: 'var(--surface)',
+            borderRadius: 'var(--radius-sm)',
+            padding: '4px 8px',
+            border: '1px solid var(--border)'
           }}>
-            <Search size={13} color="var(--text-muted)" />
+            <Search size={12} style={{ color: 'var(--foreground-muted)' }} />
             <input
               type="text"
-              placeholder="Search file path..."
+              placeholder="Filter paths..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               style={{
@@ -169,7 +171,7 @@ export const WorkspaceExplorer: React.FC<WorkspaceExplorerProps> = ({ apiBase })
                 outline: 'none',
                 background: 'transparent',
                 fontSize: '12px',
-                color: 'var(--text-primary)',
+                color: 'var(--foreground)',
                 width: '100%'
               }}
             />
@@ -177,10 +179,10 @@ export const WorkspaceExplorer: React.FC<WorkspaceExplorerProps> = ({ apiBase })
         </div>
 
         {/* File List */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '8px' }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '6px' }}>
           {filteredFiles.length === 0 ? (
-            <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
-              No files match filter.
+            <div style={{ padding: '24px', textAlign: 'center', color: 'var(--foreground-muted)', fontSize: '12px' }}>
+              No matching files found.
             </div>
           ) : (
             filteredFiles.map((f) => {
@@ -195,37 +197,39 @@ export const WorkspaceExplorer: React.FC<WorkspaceExplorerProps> = ({ apiBase })
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    gap: '8px',
-                    padding: '7px 10px',
-                    borderRadius: '6px',
+                    gap: '6px',
+                    padding: '6px 8px',
+                    borderRadius: 'var(--radius-sm)',
                     fontSize: '12px',
-                    color: isSelected ? 'var(--accent-primary)' : 'var(--text-primary)',
-                    backgroundColor: isSelected ? 'var(--accent-subtle)' : 'transparent',
+                    color: isSelected ? 'var(--brand-dark)' : 'var(--foreground)',
+                    backgroundColor: isSelected ? 'var(--brand-soft)' : 'transparent',
+                    borderLeft: isSelected ? '2px solid var(--brand)' : '2px solid transparent',
                     cursor: isDir ? 'default' : 'pointer',
                     userSelect: 'none',
-                    marginBottom: '2px'
+                    marginBottom: '1px'
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden' }}>
                     {isDir ? (
-                      <Folder size={15} color="#f59e0b" style={{ flexShrink: 0 }} />
+                      <Folder size={14} style={{ color: 'var(--warning)', flexShrink: 0 }} />
                     ) : f.path.endsWith('.md') ? (
-                      <FileText size={15} color="#0ea5e9" style={{ flexShrink: 0 }} />
+                      <FileText size={14} style={{ color: 'var(--info)', flexShrink: 0 }} />
                     ) : (
-                      <FileCode size={15} color="#10b981" style={{ flexShrink: 0 }} />
+                      <FileCode size={14} style={{ color: 'var(--brand)', flexShrink: 0 }} />
                     )}
                     <span style={{
-                      fontWeight: isDir ? 700 : isSelected ? 600 : 400,
+                      fontWeight: isDir ? 600 : isSelected ? 600 : 400,
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap'
+                      whiteSpace: 'nowrap',
+                      fontFamily: 'var(--font-mono)'
                     }}>
                       {f.path}
                     </span>
                   </div>
 
                   {!isDir && f.size !== undefined && (
-                    <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+                    <span style={{ fontSize: '10px', color: 'var(--foreground-muted)', fontFamily: 'var(--font-mono)' }}>
                       {f.size > 1024 ? `${(f.size / 1024).toFixed(1)}k` : `${f.size}b`}
                     </span>
                   )}
@@ -236,65 +240,65 @@ export const WorkspaceExplorer: React.FC<WorkspaceExplorerProps> = ({ apiBase })
         </div>
       </div>
 
-      {/* Editor / Content Preview with line numbers */}
-      <div style={{
-        backgroundColor: 'var(--bg-secondary)',
-        borderRadius: 'var(--radius)',
-        border: '1px solid var(--border-color)',
+      {/* Editor / Content Preview */}
+      <div className="card" style={{
         display: 'flex',
         flexDirection: 'column',
-        overflow: 'hidden',
-        boxShadow: 'var(--shadow-sm)'
+        overflow: 'hidden'
       }}>
         <div style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '12px 20px',
-          borderBottom: '1px solid var(--border-color)',
-          backgroundColor: 'var(--bg-tertiary)'
+          padding: '10px 16px',
+          borderBottom: '1px solid var(--border)',
+          backgroundColor: 'var(--surface-muted)'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <FileCode size={16} color="var(--accent-primary)" />
-            <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
-              {activeView === 'editor' ? (selectedFile || 'Select a file to inspect') : 'Git Working Tree Diff'}
+            <FileCode size={14} style={{ color: 'var(--brand)' }} />
+            <span style={{
+              fontSize: '13px',
+              fontFamily: 'var(--font-mono)',
+              fontWeight: 600,
+              color: 'var(--foreground)'
+            }}>
+              {activeView === 'editor' ? (selectedFile || 'Select a file to inspect') : 'Git Working Tree Changes'}
             </span>
           </div>
 
           {activeView === 'editor' && selectedFile && (
             <button
               onClick={copyCode}
+              className="button-ghost"
               style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '5px 12px',
-                borderRadius: '6px',
-                fontSize: '12px',
-                fontWeight: 500,
-                backgroundColor: 'var(--bg-secondary)',
-                border: '1px solid var(--border-color)',
-                color: 'var(--text-secondary)'
+                height: '28px',
+                padding: '0 8px',
+                fontSize: '11px',
+                border: '1px solid var(--border)',
+                backgroundColor: 'var(--surface)'
               }}
             >
-              {copied ? <Check size={13} color="var(--success)" /> : <Copy size={13} />}
-              {copied ? 'Copied' : 'Copy'}
+              {copied ? <Check size={12} style={{ color: 'var(--brand)' }} /> : <Copy size={12} />}
+              <span>{copied ? 'Copied' : 'Copy Content'}</span>
             </button>
           )}
         </div>
 
-        <div style={{ flex: 1, overflow: 'auto', backgroundColor: 'var(--bg-primary)' }}>
+        {/* Main Content Area */}
+        <div style={{ flex: 1, overflowY: 'auto', backgroundColor: 'var(--background)' }}>
           {activeView === 'editor' ? (
             selectedFile ? (
-              <div style={{ display: 'flex', minHeight: '100%', fontFamily: 'var(--font-mono)', fontSize: '13px' }}>
+              <div style={{ display: 'flex', minHeight: '100%' }}>
                 {/* Line numbers column */}
                 <div style={{
-                  padding: '16px 12px',
-                  backgroundColor: 'var(--bg-secondary)',
-                  borderRight: '1px solid var(--border-color)',
-                  color: 'var(--text-muted)',
+                  padding: '14px 10px',
+                  backgroundColor: 'var(--background-subtle)',
+                  borderRight: '1px solid var(--border)',
                   userSelect: 'none',
                   textAlign: 'right',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: '12px',
+                  color: 'var(--foreground-muted)',
                   lineHeight: '1.6'
                 }}>
                   {fileContent.split('\n').map((_, i) => (
@@ -302,72 +306,82 @@ export const WorkspaceExplorer: React.FC<WorkspaceExplorerProps> = ({ apiBase })
                   ))}
                 </div>
 
-                {/* Code content */}
-                <div style={{ padding: '16px 20px', flex: 1, overflowX: 'auto', lineHeight: '1.6', color: 'var(--text-primary)' }}>
-                  <pre style={{ margin: 0, fontFamily: 'inherit' }}>{fileContent}</pre>
-                </div>
+                {/* Code display */}
+                <pre style={{
+                  flex: 1,
+                  padding: '14px 16px',
+                  margin: 0,
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: '12px',
+                  lineHeight: '1.6',
+                  color: 'var(--foreground)',
+                  overflowX: 'auto',
+                  whiteSpace: 'pre'
+                }}>
+                  {fileContent}
+                </pre>
               </div>
             ) : (
-              <div style={{ textAlign: 'center', color: 'var(--text-muted)', paddingTop: '120px', fontSize: '14px' }}>
-                <FileCode size={40} style={{ opacity: 0.3, margin: '0 auto 12px auto' }} />
-                Select any source, config, or doc file from the left sidebar to preview code.
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                height: '100%',
+                color: 'var(--foreground-muted)',
+                gap: '8px'
+              }}>
+                <FileCode size={32} style={{ opacity: 0.3 }} />
+                <span style={{ fontSize: '13px' }}>Select any file on the left to inspect its contents.</span>
               </div>
             )
           ) : (
-            <div style={{ padding: '24px' }}>
-              <div style={{ marginBottom: '20px' }}>
-                <h4 style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>
-                  Git Working Status:
-                </h4>
-                <pre style={{
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: '12px',
-                  padding: '12px',
-                  borderRadius: '8px',
-                  backgroundColor: 'var(--bg-secondary)',
-                  border: '1px solid var(--border-color)',
-                  color: 'var(--text-primary)'
-                }}>
-                  {gitStatus || 'Working tree clean. All subagent changes committed or tracked.'}
-                </pre>
+            /* Git Diff Panel */
+            <div style={{ padding: '16px' }}>
+              <div style={{
+                padding: '8px 12px',
+                marginBottom: '12px',
+                borderRadius: 'var(--radius-sm)',
+                backgroundColor: 'var(--surface)',
+                border: '1px solid var(--border)',
+                fontFamily: 'var(--font-mono)',
+                fontSize: '12px',
+                color: 'var(--foreground-secondary)'
+              }}>
+                <strong>Status:</strong> {gitStatus || 'Working tree clean'}
               </div>
 
-              <div>
-                <h4 style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>
-                  Unified Diff Output:
-                </h4>
-                <div style={{
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: '12px',
-                  padding: '16px',
-                  borderRadius: '8px',
-                  backgroundColor: 'var(--bg-secondary)',
-                  border: '1px solid var(--border-color)',
-                  lineHeight: '1.6'
-                }}>
-                  {gitDiff ? (
-                    gitDiff.split('\n').map((line, idx) => {
-                      const isAdd = line.startsWith('+') && !line.startsWith('+++');
-                      const isDel = line.startsWith('-') && !line.startsWith('---');
-                      return (
-                        <div
-                          key={idx}
-                          style={{
-                            backgroundColor: isAdd ? 'rgba(16, 185, 129, 0.15)' : isDel ? 'rgba(239, 68, 68, 0.15)' : 'transparent',
-                            color: isAdd ? 'var(--success)' : isDel ? 'var(--danger)' : 'var(--text-primary)',
-                            padding: '0 4px',
-                            borderRadius: '2px'
-                          }}
-                        >
-                          {line}
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <span style={{ color: 'var(--text-muted)' }}>No unstaged file modifications.</span>
-                  )}
+              {gitDiff ? (
+                <div className="code-block" style={{ fontSize: '12px', lineHeight: '1.6' }}>
+                  {gitDiff.split('\n').map((line, idx) => {
+                    const isAdd = line.startsWith('+') && !line.startsWith('+++');
+                    const isDel = line.startsWith('-') && !line.startsWith('---');
+                    const isHunk = line.startsWith('@@');
+
+                    let bg = 'transparent';
+                    let color = 'var(--foreground)';
+                    if (isAdd) {
+                      bg = 'var(--brand-soft)';
+                      color = 'var(--brand-dark)';
+                    } else if (isDel) {
+                      bg = 'var(--danger-soft)';
+                      color = 'var(--danger)';
+                    } else if (isHunk) {
+                      color = 'var(--info)';
+                    }
+
+                    return (
+                      <div key={idx} style={{ backgroundColor: bg, color: color, padding: '0 4px' }}>
+                        {line || ' '}
+                      </div>
+                    );
+                  })}
                 </div>
-              </div>
+              ) : (
+                <div style={{ color: 'var(--foreground-muted)', textAlign: 'center', padding: '32px', fontSize: '13px' }}>
+                  No uncommitted working tree differences detected.
+                </div>
+              )}
             </div>
           )}
         </div>

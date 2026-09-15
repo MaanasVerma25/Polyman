@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Plus, 
   BrainCircuit, 
@@ -14,7 +14,8 @@ import {
   MessageSquare,
   Send,
   Loader2,
-  Sparkles
+  Sparkles,
+  ArrowRight
 } from 'lucide-react';
 import type { Agent } from '../../types';
 
@@ -36,13 +37,13 @@ export const AgentRoster: React.FC<AgentRosterProps> = ({ apiBase }) => {
   const [formRole, setFormRole] = useState<string>('');
   const [formName, setFormName] = useState<string>('');
   const formAvatar = 'Bot';
-  const formColor = '#7c3aed';
+  const formColor = '#3ecf8e';
   const [formDescription, setFormDescription] = useState<string>('');
   const [formPrompt, setFormPrompt] = useState<string>('');
   const [formProvider, setFormProvider] = useState<string>('gemini');
   const [formModel, setFormModel] = useState<string>('gemini-2.0-flash');
 
-  const fetchAgents = async () => {
+  const fetchAgents = useCallback(async () => {
     try {
       const res = await fetch(`${apiBase}/api/agents`);
       const data = await res.json();
@@ -50,11 +51,23 @@ export const AgentRoster: React.FC<AgentRosterProps> = ({ apiBase }) => {
     } catch (e) {
       console.error(e);
     }
-  };
+  }, [apiBase]);
 
   useEffect(() => {
     fetchAgents();
-  }, [apiBase]);
+  }, [fetchAgents]);
+
+  // Keyboard accessibility for modals
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (testingAgent) setTestingAgent(null);
+        if (showModal) setShowModal(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [testingAgent, showModal]);
 
   const handleCreateAgent = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -104,7 +117,6 @@ export const AgentRoster: React.FC<AgentRosterProps> = ({ apiBase }) => {
     setTestResponse('');
 
     try {
-      // Direct prompt simulation
       const res = await fetch(`${apiBase}/api/runs`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -115,7 +127,6 @@ export const AgentRoster: React.FC<AgentRosterProps> = ({ apiBase }) => {
       });
       const data = await res.json();
       setTestResponse(`Test mission launched successfully with run ID: ${data.run_id}. Head to Mission Control to observe the real-time execution!`);
-      // Trigger execution for serverless environments (Vercel)
       fetch(`${apiBase}/api/runs/${data.run_id}/execute`, { method: 'POST' }).catch(() => {});
     } catch (e) {
       setTestResponse(`Execution error: ${e}`);
@@ -126,54 +137,62 @@ export const AgentRoster: React.FC<AgentRosterProps> = ({ apiBase }) => {
 
   const getAgentMeta = (role: string) => {
     switch (role.toLowerCase()) {
-      case 'architect': return { icon: Layers, gradient: 'linear-gradient(135deg, #0ea5e9 0%, #38bdf8 100%)', color: '#0ea5e9' };
-      case 'sde': return { icon: Code2, gradient: 'linear-gradient(135deg, #10b981 0%, #34d399 100%)', color: '#10b981' };
-      case 'lawyer': return { icon: Scale, gradient: 'linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)', color: '#f59e0b' };
-      case 'auditor': return { icon: ShieldCheck, gradient: 'linear-gradient(135deg, #ef4444 0%, #f87171 100%)', color: '#ef4444' };
-      case 'accountant': return { icon: Calculator, gradient: 'linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%)', color: '#8b5cf6' };
-      case 'orchestrator': return { icon: BrainCircuit, gradient: 'linear-gradient(135deg, #6366f1 0%, #818cf8 100%)', color: '#6366f1' };
-      default: return { icon: Bot, gradient: 'linear-gradient(135deg, #7c3aed 0%, #06b6d4 100%)', color: '#7c3aed' };
+      case 'architect': return { icon: Layers, color: 'var(--info)', bg: 'var(--info-soft)' };
+      case 'sde': return { icon: Code2, color: 'var(--brand)', bg: 'var(--brand-soft)' };
+      case 'lawyer': return { icon: Scale, color: 'var(--warning)', bg: 'var(--warning-soft)' };
+      case 'auditor': return { icon: ShieldCheck, color: 'var(--danger)', bg: 'var(--danger-soft)' };
+      case 'accountant': return { icon: Calculator, color: 'var(--purple)', bg: 'var(--purple-bg)' };
+      case 'orchestrator': return { icon: BrainCircuit, color: 'var(--foreground)', bg: 'var(--surface-control)' };
+      default: return { icon: Bot, color: 'var(--brand)', bg: 'var(--brand-soft)' };
     }
   };
 
   return (
-    <div style={{ padding: '28px', maxWidth: '1280px', margin: '0 auto' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '28px' }}>
+    <div className="container" style={{ paddingTop: '28px', paddingBottom: '48px' }}>
+      {/* Editorial Header */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '28px', flexWrap: 'wrap', gap: '16px' }}>
         <div>
-          <h2 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text-primary)' }}>
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            fontSize: '11px',
+            fontWeight: 600,
+            letterSpacing: '0.06em',
+            textTransform: 'uppercase',
+            color: 'var(--brand-dark)',
+            backgroundColor: 'var(--brand-soft)',
+            border: '1px solid var(--border)',
+            padding: '2px 8px',
+            borderRadius: 'var(--radius-pill)',
+            marginBottom: '8px'
+          }}>
+            <span>Domain-Specialized Workforce</span>
+            <ArrowRight size={11} />
+          </div>
+
+          <h2 className="section-title" style={{ marginBottom: '6px' }}>
             Specialized Subagent Roster
           </h2>
-          <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+          <p className="body-copy" style={{ maxWidth: '600px' }}>
             Domain-trained autonomous personas equipped with targeted directives, toolchains, and LLM backends.
           </p>
         </div>
 
         <button
           onClick={() => setShowModal(true)}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            background: 'var(--accent-gradient)',
-            color: '#fff',
-            padding: '10px 18px',
-            borderRadius: '8px',
-            fontSize: '13px',
-            fontWeight: 600,
-            boxShadow: '0 4px 12px rgba(124, 58, 237, 0.3)'
-          }}
+          className="button-primary"
         >
-          <Plus size={16} />
-          Create Custom Subagent
+          <Plus size={15} />
+          <span>Create Custom Subagent</span>
         </button>
       </div>
 
       {/* Grid of Agents */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))',
-        gap: '20px'
+        gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
+        gap: '16px'
       }}>
         {agents.map((agent) => {
           const meta = getAgentMeta(agent.role);
@@ -182,78 +201,66 @@ export const AgentRoster: React.FC<AgentRosterProps> = ({ apiBase }) => {
           return (
             <div
               key={agent.id}
+              className="card-hoverable"
               style={{
-                backgroundColor: 'var(--bg-secondary)',
-                border: '1px solid var(--border-color)',
-                borderRadius: '12px',
-                padding: '24px',
+                padding: '20px',
                 display: 'flex',
                 flexDirection: 'column',
-                justifyContent: 'space-between',
-                boxShadow: 'var(--shadow-sm)',
-                transition: 'all 0.2s ease'
+                justifyContent: 'space-between'
               }}
             >
               <div>
                 {/* Agent Header */}
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '14px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <div style={{
-                      width: '42px',
-                      height: '42px',
-                      borderRadius: '10px',
-                      background: meta.gradient,
-                      color: '#fff',
+                      width: '36px',
+                      height: '36px',
+                      borderRadius: 'var(--radius-md)',
+                      background: meta.bg,
+                      color: meta.color,
+                      border: '1px solid var(--border)',
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'center',
-                      boxShadow: `0 3px 10px ${meta.color}40`
+                      justifyContent: 'center'
                     }}>
-                      <Icon size={22} />
+                      <Icon size={18} />
                     </div>
                     <div>
-                      <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                      <h3 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--foreground)' }}>
                         {agent.name}
                       </h3>
-                      <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+                      <span style={{ fontSize: '11px', color: 'var(--foreground-muted)', fontFamily: 'var(--font-mono)' }}>
                         @{agent.role}
                       </span>
                     </div>
                   </div>
 
-                  <span style={{
-                    fontSize: '10px',
-                    fontWeight: 700,
-                    padding: '3px 10px',
-                    borderRadius: '20px',
-                    backgroundColor: agent.is_builtin ? 'var(--bg-tertiary)' : 'var(--accent-subtle)',
-                    color: agent.is_builtin ? 'var(--text-secondary)' : 'var(--accent-primary)',
-                    border: '1px solid var(--border-color)',
-                    textTransform: 'uppercase'
-                  }}>
+                  <span className={agent.is_builtin ? "status-pill neutral" : "status-pill success"} style={{ fontSize: '10px' }}>
                     {agent.is_builtin ? 'Core Agent' : 'Custom'}
                   </span>
                 </div>
 
                 {/* Description */}
-                <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.5', marginBottom: '16px' }}>
+                <p style={{ fontSize: '13px', color: 'var(--foreground-secondary)', lineHeight: '1.5', marginBottom: '14px' }}>
                   {agent.description}
                 </p>
 
                 {/* System Prompt snippet */}
                 <div style={{
-                  backgroundColor: 'var(--bg-primary)',
-                  padding: '12px',
-                  borderRadius: '8px',
-                  border: '1px solid var(--border-color)',
-                  marginBottom: '16px'
+                  backgroundColor: 'var(--background-alternative)',
+                  padding: '10px 12px',
+                  borderRadius: 'var(--radius-sm)',
+                  border: '1px solid var(--border)',
+                  marginBottom: '14px'
                 }}>
-                  <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--foreground-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                     Core Directive
-                  </span>
+                  </div>
                   <p style={{
                     fontSize: '11px',
-                    color: 'var(--text-secondary)',
+                    fontFamily: 'var(--font-mono)',
+                    color: 'var(--foreground-secondary)',
                     lineHeight: '1.5',
                     marginTop: '4px',
                     maxHeight: '44px',
@@ -270,43 +277,42 @@ export const AgentRoster: React.FC<AgentRosterProps> = ({ apiBase }) => {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                paddingTop: '14px',
-                borderTop: '1px solid var(--border-color)'
+                paddingTop: '12px',
+                borderTop: '1px solid var(--border)'
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--text-muted)' }}>
-                  <Cpu size={14} color="var(--accent-primary)" />
-                  <span>{agent.default_provider.toUpperCase()}: <strong style={{ color: 'var(--text-secondary)' }}>{agent.default_model}</strong></span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--foreground-muted)', fontFamily: 'var(--font-mono)' }}>
+                  <Cpu size={13} style={{ color: 'var(--brand)' }} />
+                  <span>{agent.default_provider.toUpperCase()}: <strong style={{ color: 'var(--foreground)' }}>{agent.default_model}</strong></span>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <button
                     onClick={() => {
                       setTestingAgent(agent);
                       setTestInput(`Perform initial domain assessment for project tasks.`);
                     }}
+                    className="button-ghost"
                     style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
+                      height: '28px',
+                      padding: '0 8px',
                       fontSize: '11px',
-                      fontWeight: 600,
-                      padding: '4px 10px',
-                      borderRadius: '6px',
-                      backgroundColor: 'var(--accent-subtle)',
-                      color: 'var(--accent-primary)'
+                      border: '1px solid var(--border)',
+                      backgroundColor: 'var(--surface)'
                     }}
                   >
-                    <MessageSquare size={12} />
-                    Test
+                    <MessageSquare size={11} />
+                    <span>Test</span>
                   </button>
 
                   {!agent.is_builtin && (
                     <button
                       onClick={() => handleDeleteAgent(agent.id)}
-                      style={{ color: 'var(--danger)', padding: '4px' }}
+                      className="button-ghost"
+                      style={{ height: '28px', width: '28px', padding: 0, color: 'var(--danger)' }}
                       title="Delete custom agent"
+                      aria-label={`Delete ${agent.name}`}
                     >
-                      <Trash2 size={14} />
+                      <Trash2 size={13} />
                     </button>
                   )}
                 </div>
@@ -316,71 +322,52 @@ export const AgentRoster: React.FC<AgentRosterProps> = ({ apiBase }) => {
         })}
       </div>
 
-      {/* Test Agent Drawer */}
+      {/* Test Agent Drawer / Dialog */}
       {testingAgent && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.6)',
-          backdropFilter: 'blur(4px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 100
-        }}>
-          <div style={{
-            backgroundColor: 'var(--bg-secondary)',
-            borderRadius: '12px',
-            border: '1px solid var(--border-color)',
-            width: '100%',
-            maxWidth: '540px',
-            padding: '24px',
-            boxShadow: 'var(--shadow-lg)'
-          }}>
+        <div className="dialog-backdrop" onClick={() => setTestingAgent(null)}>
+          <div 
+            className="dialog-content"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: '520px', padding: '24px' }}
+          >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Sparkles size={18} color="var(--accent-primary)" />
-                <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                <Sparkles size={16} style={{ color: 'var(--brand)' }} />
+                <h3 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--foreground)' }}>
                   Test Subagent: {testingAgent.name}
                 </h3>
               </div>
-              <button onClick={() => setTestingAgent(null)} style={{ color: 'var(--text-muted)' }}>
-                <X size={18} />
+              <button 
+                onClick={() => setTestingAgent(null)} 
+                className="button-ghost"
+                style={{ width: '28px', height: '28px', padding: 0 }}
+                aria-label="Close dialog"
+              >
+                <X size={16} />
               </button>
             </div>
 
             <div style={{ marginBottom: '14px' }}>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>
-                Prompt Input
+              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--foreground-secondary)', display: 'block', marginBottom: '6px' }}>
+                Test Prompt Directive
               </label>
               <textarea
                 rows={3}
                 value={testInput}
                 onChange={(e) => setTestInput(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '10px 12px',
-                  fontSize: '13px',
-                  borderRadius: '8px',
-                  border: '1px solid var(--border-strong)',
-                  backgroundColor: 'var(--bg-primary)',
-                  color: 'var(--text-primary)',
-                  resize: 'none'
-                }}
+                className="textarea"
+                style={{ fontSize: '13px' }}
               />
             </div>
 
             {testResponse && (
               <div style={{
-                backgroundColor: 'var(--bg-primary)',
+                backgroundColor: 'var(--background-alternative)',
                 padding: '12px',
-                borderRadius: '8px',
-                border: '1px solid var(--border-color)',
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid var(--border)',
                 fontSize: '12px',
-                color: 'var(--text-primary)',
+                color: 'var(--foreground)',
                 marginBottom: '14px',
                 lineHeight: '1.5'
               }}>
@@ -391,33 +378,17 @@ export const AgentRoster: React.FC<AgentRosterProps> = ({ apiBase }) => {
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
               <button
                 onClick={() => setTestingAgent(null)}
-                style={{
-                  padding: '8px 14px',
-                  borderRadius: '6px',
-                  fontSize: '12px',
-                  backgroundColor: 'var(--bg-tertiary)',
-                  color: 'var(--text-secondary)'
-                }}
+                className="button-secondary"
               >
                 Close
               </button>
               <button
                 onClick={runAgentTest}
                 disabled={testLoading}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '8px 16px',
-                  borderRadius: '6px',
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  background: 'var(--accent-gradient)',
-                  color: '#fff'
-                }}
+                className="button-primary"
               >
                 {testLoading ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
-                Trigger Test
+                <span>Trigger Test</span>
               </button>
             </div>
           </div>
@@ -426,40 +397,29 @@ export const AgentRoster: React.FC<AgentRosterProps> = ({ apiBase }) => {
 
       {/* Create Agent Modal */}
       {showModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.6)',
-          backdropFilter: 'blur(4px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 100
-        }}>
-          <div style={{
-            backgroundColor: 'var(--bg-secondary)',
-            borderRadius: '12px',
-            border: '1px solid var(--border-color)',
-            width: '100%',
-            maxWidth: '520px',
-            padding: '24px',
-            boxShadow: 'var(--shadow-lg)'
-          }}>
+        <div className="dialog-backdrop" onClick={() => setShowModal(false)}>
+          <div 
+            className="dialog-content"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: '500px', padding: '24px' }}
+          >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-              <h3 style={{ fontSize: '17px', fontWeight: 700, color: 'var(--text-primary)' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--foreground)' }}>
                 Create Custom Specialized Subagent
               </h3>
-              <button onClick={() => setShowModal(false)} style={{ color: 'var(--text-muted)' }}>
-                <X size={18} />
+              <button 
+                onClick={() => setShowModal(false)} 
+                className="button-ghost"
+                style={{ width: '28px', height: '28px', padding: 0 }}
+                aria-label="Close dialog"
+              >
+                <X size={16} />
               </button>
             </div>
 
-            <form onSubmit={handleCreateAgent} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <form onSubmit={handleCreateAgent} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div>
-                <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
+                <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--foreground-secondary)', display: 'block', marginBottom: '4px' }}>
                   Role Identifier (e.g. devops, copywriter, tax_auditor)
                 </label>
                 <input
@@ -468,20 +428,12 @@ export const AgentRoster: React.FC<AgentRosterProps> = ({ apiBase }) => {
                   placeholder="qa_specialist"
                   value={formRole}
                   onChange={(e) => setFormRole(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '8px 10px',
-                    fontSize: '13px',
-                    borderRadius: '6px',
-                    border: '1px solid var(--border-strong)',
-                    backgroundColor: 'var(--bg-primary)',
-                    color: 'var(--text-primary)'
-                  }}
+                  className="input"
                 />
               </div>
 
               <div>
-                <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
+                <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--foreground-secondary)', display: 'block', marginBottom: '4px' }}>
                   Agent Display Name
                 </label>
                 <input
@@ -490,20 +442,12 @@ export const AgentRoster: React.FC<AgentRosterProps> = ({ apiBase }) => {
                   placeholder="QA Automation Specialist"
                   value={formName}
                   onChange={(e) => setFormName(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '8px 10px',
-                    fontSize: '13px',
-                    borderRadius: '6px',
-                    border: '1px solid var(--border-strong)',
-                    backgroundColor: 'var(--bg-primary)',
-                    color: 'var(--text-primary)'
-                  }}
+                  className="input"
                 />
               </div>
 
               <div>
-                <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
+                <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--foreground-secondary)', display: 'block', marginBottom: '4px' }}>
                   Description
                 </label>
                 <input
@@ -511,20 +455,12 @@ export const AgentRoster: React.FC<AgentRosterProps> = ({ apiBase }) => {
                   placeholder="Validates edge cases, generates Playwright tests, and runs benchmark assertions."
                   value={formDescription}
                   onChange={(e) => setFormDescription(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '8px 10px',
-                    fontSize: '13px',
-                    borderRadius: '6px',
-                    border: '1px solid var(--border-strong)',
-                    backgroundColor: 'var(--bg-primary)',
-                    color: 'var(--text-primary)'
-                  }}
+                  className="input"
                 />
               </div>
 
               <div>
-                <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
+                <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--foreground-secondary)', display: 'block', marginBottom: '4px' }}>
                   System Prompt Directive
                 </label>
                 <textarea
@@ -533,36 +469,19 @@ export const AgentRoster: React.FC<AgentRosterProps> = ({ apiBase }) => {
                   placeholder="You are a specialized QA engineer. You review code diffs and generate unit/integration test cases..."
                   value={formPrompt}
                   onChange={(e) => setFormPrompt(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '8px 10px',
-                    fontSize: '13px',
-                    borderRadius: '6px',
-                    border: '1px solid var(--border-strong)',
-                    backgroundColor: 'var(--bg-primary)',
-                    color: 'var(--text-primary)',
-                    resize: 'vertical'
-                  }}
+                  className="textarea"
                 />
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                 <div>
-                  <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
+                  <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--foreground-secondary)', display: 'block', marginBottom: '4px' }}>
                     LLM Provider
                   </label>
                   <select
                     value={formProvider}
                     onChange={(e) => setFormProvider(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '8px 10px',
-                      fontSize: '13px',
-                      borderRadius: '6px',
-                      border: '1px solid var(--border-strong)',
-                      backgroundColor: 'var(--bg-primary)',
-                      color: 'var(--text-primary)'
-                    }}
+                    className="select"
                   >
                     <option value="gemini">Google Gemini</option>
                     <option value="anthropic">Anthropic Claude</option>
@@ -572,50 +491,29 @@ export const AgentRoster: React.FC<AgentRosterProps> = ({ apiBase }) => {
                 </div>
 
                 <div>
-                  <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
+                  <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--foreground-secondary)', display: 'block', marginBottom: '4px' }}>
                     Model
                   </label>
                   <input
                     type="text"
                     value={formModel}
                     onChange={(e) => setFormModel(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '8px 10px',
-                      fontSize: '13px',
-                      borderRadius: '6px',
-                      border: '1px solid var(--border-strong)',
-                      backgroundColor: 'var(--bg-primary)',
-                      color: 'var(--text-primary)'
-                    }}
+                    className="input"
                   />
                 </div>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '12px' }}>
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  style={{
-                    padding: '8px 14px',
-                    borderRadius: '6px',
-                    fontSize: '13px',
-                    backgroundColor: 'var(--bg-tertiary)',
-                    color: 'var(--text-secondary)'
-                  }}
+                  className="button-secondary"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  style={{
-                    padding: '8px 18px',
-                    borderRadius: '6px',
-                    fontSize: '13px',
-                    fontWeight: 600,
-                    background: 'var(--accent-gradient)',
-                    color: '#fff'
-                  }}
+                  className="button-primary"
                 >
                   Save Agent
                 </button>

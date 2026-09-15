@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Code2, 
   Scale, 
@@ -30,34 +30,44 @@ export const DAGVisualizer: React.FC<DAGVisualizerProps> = ({
 }) => {
   const [inspectNode, setInspectNode] = useState<DAGNode | null>(null);
 
+  // Keyboard accessibility: Close modal on Escape
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && inspectNode) {
+        setInspectNode(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [inspectNode]);
+
   if (!nodes || nodes.length === 0) {
     return (
-      <div style={{
-        padding: '56px 24px',
+      <div className="card" style={{
+        padding: '48px 24px',
         textAlign: 'center',
-        backgroundColor: 'var(--bg-secondary)',
-        borderRadius: 'var(--radius)',
         border: '1px dashed var(--border-strong)',
-        color: 'var(--text-muted)'
+        color: 'var(--foreground-muted)'
       }}>
         <div style={{
-          width: '56px',
-          height: '56px',
-          borderRadius: '16px',
-          background: 'var(--accent-subtle)',
-          color: 'var(--accent-primary)',
+          width: '48px',
+          height: '48px',
+          borderRadius: 'var(--radius-md)',
+          background: 'var(--surface-control)',
+          border: '1px solid var(--border)',
+          color: 'var(--brand)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          margin: '0 auto 16px auto'
+          margin: '0 auto 14px auto'
         }}>
-          <BrainCircuit size={32} />
+          <BrainCircuit size={24} />
         </div>
-        <h3 style={{ fontSize: '17px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '6px' }}>
+        <h3 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--foreground)', marginBottom: '4px' }}>
           Dynamic Execution DAG Pipeline
         </h3>
-        <p style={{ fontSize: '13px', maxWidth: '460px', margin: '0 auto', lineHeight: '1.6' }}>
-          Enter a task prompt above. The Chief Orchestrator will synthesize the plan into a multi-stage dependency graph, streaming real-time work across specialized subagents.
+        <p style={{ fontSize: '13px', maxWidth: '440px', margin: '0 auto', lineHeight: '1.6', color: 'var(--foreground-secondary)' }}>
+          Enter a task prompt above to initiate synthesis. The Orchestrator constructs a multi-stage dependency graph, streaming concurrent operations across specialized subagents.
         </p>
       </div>
     );
@@ -66,17 +76,17 @@ export const DAGVisualizer: React.FC<DAGVisualizerProps> = ({
   const getAgentMeta = (role: string) => {
     switch (role.toLowerCase()) {
       case 'architect':
-        return { name: 'System Architect', color: '#0ea5e9', gradient: 'linear-gradient(135deg, #0ea5e9 0%, #38bdf8 100%)', icon: Layers, tag: 'Blueprint' };
+        return { name: 'System Architect', color: 'var(--info)', bg: 'var(--info-soft)', icon: Layers, tag: 'Blueprint' };
       case 'sde':
-        return { name: 'Software Engineer', color: '#10b981', gradient: 'linear-gradient(135deg, #10b981 0%, #34d399 100%)', icon: Code2, tag: 'Code & Tests' };
+        return { name: 'Software Engineer', color: 'var(--brand)', bg: 'var(--brand-soft)', icon: Code2, tag: 'Code & Tests' };
       case 'lawyer':
-        return { name: 'Legal Counsel', color: '#f59e0b', gradient: 'linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)', icon: Scale, tag: 'Compliance' };
+        return { name: 'Legal Counsel', color: 'var(--warning)', bg: 'var(--warning-soft)', icon: Scale, tag: 'Compliance' };
       case 'auditor':
-        return { name: 'Security Auditor', color: '#ef4444', gradient: 'linear-gradient(135deg, #ef4444 0%, #f87171 100%)', icon: ShieldCheck, tag: 'Audit' };
+        return { name: 'Security Auditor', color: 'var(--danger)', bg: 'var(--danger-soft)', icon: ShieldCheck, tag: 'Security' };
       case 'accountant':
-        return { name: 'Financial Accountant', color: '#8b5cf6', gradient: 'linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%)', icon: Calculator, tag: 'FinOps' };
+        return { name: 'Financial Accountant', color: 'var(--purple)', bg: 'var(--purple-bg)', icon: Calculator, tag: 'FinOps' };
       default:
-        return { name: role.toUpperCase(), color: '#6366f1', gradient: 'linear-gradient(135deg, #6366f1 0%, #818cf8 100%)', icon: BrainCircuit, tag: 'Subagent' };
+        return { name: role.toUpperCase(), color: 'var(--foreground)', bg: 'var(--surface-control)', icon: BrainCircuit, tag: 'Persona' };
     }
   };
 
@@ -86,98 +96,86 @@ export const DAGVisualizer: React.FC<DAGVisualizerProps> = ({
         return {
           label: 'Completed',
           icon: CheckCircle2,
-          bg: 'var(--success-bg)',
-          color: 'var(--success)',
-          border: 'rgba(16, 185, 129, 0.4)'
+          className: 'status-pill success'
         };
       case 'running':
         return {
           label: 'In Progress',
           icon: Loader2,
-          bg: 'var(--accent-subtle)',
-          color: 'var(--accent-primary)',
-          border: 'var(--border-glow)',
-          spin: true
+          className: 'status-pill',
+          spin: true,
+          style: { background: 'var(--brand-soft)', color: 'var(--brand-dark)', borderColor: 'var(--border)' }
         };
       case 'failed':
         return {
           label: 'Failed',
           icon: AlertCircle,
-          bg: 'var(--danger-bg)',
-          color: 'var(--danger)',
-          border: 'rgba(239, 68, 68, 0.4)'
+          className: 'status-pill danger'
         };
       case 'skipped':
         return {
           label: 'Skipped',
           icon: AlertCircle,
-          bg: 'var(--bg-hover)',
-          color: 'var(--text-muted)',
-          border: 'var(--border-color)'
+          className: 'status-pill neutral'
         };
       default:
         return {
           label: 'Queued',
           icon: Clock,
-          bg: 'var(--bg-tertiary)',
-          color: 'var(--text-secondary)',
-          border: 'var(--border-color)'
+          className: 'status-pill neutral'
         };
     }
   };
 
+  const completedCount = nodes.filter(n => n.status === 'completed').length;
+  const progressPercent = Math.round((completedCount / Math.max(nodes.length, 1)) * 100);
+
   return (
-    <div style={{
-      backgroundColor: 'var(--bg-secondary)',
-      borderRadius: 'var(--radius)',
-      border: '1px solid var(--border-color)',
-      padding: '24px',
-      boxShadow: 'var(--shadow-md)',
-      position: 'relative'
-    }}>
-      {/* Header with Pipeline Progress */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+    <div className="card" style={{ padding: '20px 22px' }}>
+      {/* Header with Progress Bar */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <div style={{
-            width: '32px',
-            height: '32px',
-            borderRadius: '8px',
-            background: 'var(--accent-subtle)',
+            width: '28px',
+            height: '28px',
+            borderRadius: 'var(--radius-sm)',
+            background: 'var(--surface-control)',
+            border: '1px solid var(--border)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            color: 'var(--accent-primary)'
+            color: 'var(--brand)'
           }}>
-            <Sparkles size={18} />
+            <Sparkles size={15} />
           </div>
           <div>
-            <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)' }}>
+            <h3 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--foreground)' }}>
               Execution DAG Graph
             </h3>
-            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-              {nodes.filter(n => n.status === 'completed').length} of {nodes.length} subagent tasks completed
+            <span style={{ fontSize: '12px', color: 'var(--foreground-muted)' }}>
+              {completedCount} of {nodes.length} subagent tasks completed
             </span>
           </div>
         </div>
 
-        {/* Mini progress bar */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        {/* Minimal Progress Bar */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <div style={{
-            width: '140px',
-            height: '6px',
-            borderRadius: '3px',
-            backgroundColor: 'var(--bg-tertiary)',
+            width: '120px',
+            height: '4px',
+            borderRadius: '2px',
+            backgroundColor: 'var(--border)',
             overflow: 'hidden'
           }}>
             <div style={{
-              width: `${(nodes.filter(n => n.status === 'completed').length / Math.max(nodes.length, 1)) * 100}%`,
+              width: `${progressPercent}%`,
               height: '100%',
-              background: 'var(--accent-gradient)',
-              transition: 'width 0.3s ease'
+              background: 'var(--brand)',
+              transition: 'width 250ms ease'
             }} />
           </div>
-          <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--accent-primary)', fontFamily: 'var(--font-mono)' }}>
-            {Math.round((nodes.filter(n => n.status === 'completed').length / Math.max(nodes.length, 1)) * 100)}%
+          <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--foreground)', fontFamily: 'var(--font-mono)' }}>
+            {progressPercent}%
           </span>
         </div>
       </div>
@@ -185,8 +183,8 @@ export const DAGVisualizer: React.FC<DAGVisualizerProps> = ({
       {/* Nodes Grid */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(290px, 1fr))',
-        gap: '16px'
+        gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+        gap: '14px'
       }}>
         {nodes.map((node) => {
           const meta = getAgentMeta(node.agent_role);
@@ -200,104 +198,90 @@ export const DAGVisualizer: React.FC<DAGVisualizerProps> = ({
             <div
               key={node.id}
               onClick={() => {
-                onSelectNode && onSelectNode(node);
+                if (onSelectNode) onSelectNode(node);
                 setInspectNode(node);
               }}
-              className={isRunning ? 'pulsing-node' : ''}
+              className={`card-hoverable ${isRunning ? 'pulsing-node' : ''}`}
               style={{
                 position: 'relative',
-                backgroundColor: isSelected ? 'var(--accent-subtle)' : 'var(--bg-primary)',
-                border: `1.5px solid ${isSelected ? 'var(--accent-primary)' : isRunning ? 'var(--accent-primary)' : 'var(--border-color)'}`,
-                borderRadius: '12px',
-                padding: '18px',
+                padding: '16px',
                 cursor: 'pointer',
-                transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                borderColor: isSelected ? 'var(--brand)' : isRunning ? 'var(--brand)' : 'var(--border)',
+                backgroundColor: isSelected ? 'var(--surface-muted)' : 'var(--surface)',
                 display: 'flex',
                 flexDirection: 'column',
-                justifyContent: 'space-between',
-                boxShadow: isRunning ? '0 0 20px rgba(139, 92, 246, 0.25)' : 'none'
+                justifyContent: 'space-between'
               }}
             >
-              {/* Agent Badge & Status */}
               <div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                {/* Agent Badge & Status */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <div style={{
-                      width: '32px',
-                      height: '32px',
-                      borderRadius: '8px',
-                      background: meta.gradient,
-                      color: '#fff',
+                      width: '28px',
+                      height: '28px',
+                      borderRadius: 'var(--radius-sm)',
+                      background: meta.bg,
+                      color: meta.color,
+                      border: '1px solid var(--border)',
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'center',
-                      boxShadow: `0 2px 8px ${meta.color}40`
+                      justifyContent: 'center'
                     }}>
-                      <AgentIcon size={18} />
+                      <AgentIcon size={15} />
                     </div>
                     <div>
-                      <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                      <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--foreground)' }}>
                         {meta.name}
                       </span>
-                      <div style={{ fontSize: '10px', color: meta.color, fontWeight: 600 }}>
+                      <div style={{ fontSize: '10px', color: 'var(--foreground-muted)', fontWeight: 500, fontFamily: 'var(--font-mono)' }}>
                         {meta.tag}
                       </div>
                     </div>
                   </div>
 
-                  <span style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    fontSize: '11px',
-                    fontWeight: 600,
-                    padding: '3px 10px',
-                    borderRadius: '20px',
-                    backgroundColor: status.bg,
-                    color: status.color,
-                    border: `1px solid ${status.border}`
-                  }}>
-                    <StatusIcon size={12} className={status.spin ? 'animate-spin' : ''} />
+                  <span className={status.className} style={status.style}>
+                    <StatusIcon size={11} className={status.spin ? 'animate-spin' : ''} />
                     {status.label}
                   </span>
                 </div>
 
                 {/* Title & Description */}
-                <h4 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '6px' }}>
+                <h4 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--foreground)', marginBottom: '4px', lineHeight: '1.4' }}>
                   {node.title}
                 </h4>
-                <p style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.5', marginBottom: '14px' }}>
+                <p style={{ fontSize: '12px', color: 'var(--foreground-secondary)', lineHeight: '1.5', marginBottom: '12px' }}>
                   {node.description}
                 </p>
               </div>
 
               {/* Node Footer */}
               <div style={{
-                borderTop: '1px solid var(--border-color)',
-                paddingTop: '10px',
+                borderTop: '1px solid var(--border)',
+                paddingTop: '8px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 fontSize: '11px'
               }}>
                 {node.dependencies && node.dependencies.length > 0 ? (
-                  <div style={{ color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <div style={{ color: 'var(--foreground-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <ArrowRight size={11} />
                     <span>Awaits: <strong>{node.dependencies.length} parent</strong></span>
                   </div>
                 ) : (
-                  <span style={{ color: 'var(--success)', fontWeight: 600 }}>
-                    ⚡ Root Task
+                  <span style={{ color: 'var(--brand)', fontWeight: 500 }}>
+                    Root Task
                   </span>
                 )}
 
                 {node.output_data ? (
-                  <span style={{ color: 'var(--accent-primary)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px' }}>
-                    View Deliverable <ExternalLink size={11} />
+                  <span style={{ color: 'var(--brand-dark)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px' }}>
+                    Deliverable <ExternalLink size={10} />
                   </span>
                 ) : (
-                  <span style={{ color: 'var(--text-muted)' }}>
-                    Pending run
+                  <span style={{ color: 'var(--foreground-muted)' }}>
+                    Pending
                   </span>
                 )}
               </div>
@@ -306,66 +290,51 @@ export const DAGVisualizer: React.FC<DAGVisualizerProps> = ({
         })}
       </div>
 
-      {/* Inspect Node Modal */}
+      {/* Inspect Node Dialog */}
       {inspectNode && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.6)',
-          backdropFilter: 'blur(4px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 100
-        }}>
-          <div style={{
-            backgroundColor: 'var(--bg-secondary)',
-            borderRadius: 'var(--radius)',
-            border: '1px solid var(--border-color)',
-            width: '100%',
-            maxWidth: '560px',
-            padding: '24px',
-            boxShadow: 'var(--shadow-lg)'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+        <div className="dialog-backdrop" onClick={() => setInspectNode(null)}>
+          <div 
+            className="dialog-content"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: '580px', padding: '24px' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '16px' }}>
               <div>
-                <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--accent-primary)', textTransform: 'uppercase' }}>
-                  Subagent Deliverable Inspection
+                <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--brand)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Task Inspector
                 </span>
-                <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--foreground)' }}>
                   {inspectNode.title}
                 </h3>
               </div>
-              <button onClick={() => setInspectNode(null)} style={{ color: 'var(--text-muted)' }}>
-                <X size={18} />
+              <button 
+                onClick={() => setInspectNode(null)} 
+                className="button-ghost"
+                style={{ width: '28px', height: '28px', padding: 0 }}
+                aria-label="Close inspector modal"
+              >
+                <X size={16} />
               </button>
             </div>
 
-            <div style={{ backgroundColor: 'var(--bg-primary)', padding: '16px', borderRadius: '8px', marginBottom: '16px', border: '1px solid var(--border-color)' }}>
-              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>
-                <strong>Agent Role:</strong> {inspectNode.agent_role.toUpperCase()}
+            <div style={{
+              backgroundColor: 'var(--background-alternative)',
+              padding: '14px 16px',
+              borderRadius: 'var(--radius-md)',
+              marginBottom: '16px',
+              border: '1px solid var(--border)'
+            }}>
+              <div style={{ display: 'flex', gap: '16px', fontSize: '12px', color: 'var(--foreground-secondary)', marginBottom: '8px' }}>
+                <span><strong>Role:</strong> {inspectNode.agent_role.toUpperCase()}</span>
+                <span><strong>Status:</strong> {inspectNode.status.toUpperCase()}</span>
               </div>
-              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>
-                <strong>Status:</strong> {inspectNode.status.toUpperCase()}
-              </div>
+
               {inspectNode.output_data && (
-                <div>
-                  <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
-                    Output Summary:
+                <div style={{ marginTop: '10px' }}>
+                  <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--foreground)', marginBottom: '4px' }}>
+                    Output Data:
                   </div>
-                  <pre style={{
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: '12px',
-                    padding: '10px',
-                    backgroundColor: 'var(--bg-secondary)',
-                    borderRadius: '6px',
-                    border: '1px solid var(--border-color)',
-                    whiteSpace: 'pre-wrap',
-                    color: 'var(--text-primary)'
-                  }}>
+                  <pre className="code-block" style={{ maxHeight: '240px', fontSize: '12px' }}>
                     {JSON.stringify(inspectNode.output_data, null, 2)}
                   </pre>
                 </div>
@@ -375,14 +344,7 @@ export const DAGVisualizer: React.FC<DAGVisualizerProps> = ({
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
               <button
                 onClick={() => setInspectNode(null)}
-                style={{
-                  padding: '8px 16px',
-                  borderRadius: '6px',
-                  backgroundColor: 'var(--accent-primary)',
-                  color: '#fff',
-                  fontSize: '13px',
-                  fontWeight: 600
-                }}
+                className="button-secondary"
               >
                 Close
               </button>

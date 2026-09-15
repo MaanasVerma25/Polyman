@@ -49,18 +49,18 @@ def _default_gemini_keys() -> list:
     return keys
 
 def _default_gemini_agent_keys() -> dict:
-    mapping = {}
     known_roles = ["orchestrator", "architect", "sde", "lawyer", "auditor", "accountant"]
-    for role in known_roles:
-        val = os.getenv(f"GEMINI_API_KEY_{role.upper()}", "").strip()
-        if val:
-            mapping[role] = val
-    all_keys = _default_gemini_keys()
-    if all_keys:
+    agent_keys = _default_gemini_keys()
+    role_key_map = {}
+    if agent_keys:
         for idx, role in enumerate(known_roles):
-            if role not in mapping:
-                mapping[role] = all_keys[idx % len(all_keys)]
-    return mapping
+            role_key_map[role] = agent_keys[idx % len(agent_keys)]
+    else:
+        for role in known_roles:
+            val = os.getenv(f"GEMINI_API_KEY_{role.upper()}", "").strip()
+            if val:
+                role_key_map[role] = val
+    return role_key_map
 
 class Settings(BaseModel):
     app_name: str = "Polyman"

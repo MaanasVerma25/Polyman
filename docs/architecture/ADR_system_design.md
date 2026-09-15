@@ -1,239 +1,224 @@
-# Architecture Decision Record (ADR) – Café/Restaurant Startup Platform  
+# Architecture Decision Record (ADR) – Secure Microservice API  
+**Title:** Secure Microservice API with JWT Authentication, Budget‑Estimation, and MIT‑License Compliance  
+**Status:** ✅ Accepted  
 **Date:** 2026‑09‑15  
-**Status:** ✅ *Accepted*  
+**Authors:** Principal Software Architect (ChatGPT)  
 
 ---
 
 ## 1. Context & Problem Statement  
 
-The client wants a **software platform** that will help them launch a café/restaurant on the JSS University Noida campus. The platform must:
+The product team requires a **public‑facing API** that:
 
-1. **Produce & store** all legal documentation required for a food‑service business (company registration, licences, health & safety, lease agreements, employment contracts, etc.).  
-2. **Generate & maintain** financial statements (balance sheet, profit & loss, cash‑flow, break‑even analysis, budgeting).  
-3. **Support day‑to‑day operations** – menu creation, inventory tracking, purchase orders, and basic point‑of‑sale (POS) data capture.  
-4. Be **extensible** for future features (online ordering, loyalty program, analytics).  
+1. Exposes a **budget‑estimation** capability.  
+2. Enforces **strong security** using **JWT‑based authentication & authorization**.  
+3. Guarantees **MIT‑license compliance** for all source code and generated artifacts.  
+4. Is **scalable**, **maintainable**, and **deployable** as independent micro‑services.  
 
-The solution should be **maintainable**, **secure**, and **easy to deploy** by a small technical team (or a single full‑stack developer).
+The solution must be language‑agnostic, cloud‑native, and support automated testing, CI/CD, and observability.
 
 ---
 
 ## 2. Decision  
 
-We will build a **modular micro‑service architecture** hosted on a cloud‑native platform (AWS / Azure / GCP). Each business capability is a separate service exposing a **RESTful JSON API** documented with **OpenAPI 3.0**.  
+Adopt a **microservice architecture** built around four logical services, each running in its own container and communicating over **HTTPS/REST** (with optional gRPC for internal high‑throughput calls). An **API‑Gateway** sits at the edge to handle routing, request‑level security, rate‑limiting, and API‑versioning.  
 
-Key decisions:
+All services will be **stateless** (except the Budget Service which may use a read‑only data store) and will store configuration in **environment variables** or a **central config service** (e.g., Consul, Spring Cloud Config).  
 
-| Decision | Rationale |
-|----------|-----------|
-| **Micro‑service style** (5 core services) | Clear separation of concerns, independent scaling (e.g., inventory may need more compute than legal docs), easier to replace or extend a single domain. |
-| **REST/JSON over HTTP** | Universally understood, works with browsers, mobile apps, and simple CLI tools. |
-| **OpenAPI 3.0 contracts** | Enables automatic client SDK generation, API‑gateway validation, and documentation (Swagger UI). |
-| **Stateless services + JWT auth** | Simplifies horizontal scaling; JWT issued by an Auth Service (future addition). |
-| **PostgreSQL per service (or shared DB with schemas)** | Strong ACID guarantees for financial/legal data; easy to migrate to managed RDS/Aurora. |
-| **Docker containers + Kubernetes (or managed K8s)** | Consistent dev‑prod parity, automated roll‑outs, health‑checks. |
-| **Infrastructure‑as‑Code (Terraform)** | Reproducible environments, version‑controlled infra. |
-| **CI/CD pipeline (GitHub Actions / GitLab CI)** | Automated linting, unit tests, OpenAPI validation, container build, and deployment. |
-| **File storage on object store (S3 / GCS)** | Large documents (PDFs, scanned licences) stored outside the DB, with signed URLs for access. |
-| **Logging & monitoring (ELK / Loki + Grafana)** | Centralised observability for compliance audits. |
+The stack will be **Node.js (TypeScript) + Express** for the gateway, **Go** for the Authentication Service (leveraging its strong crypto libraries), **Python (FastAPI)** for the Budget Estimation Service (to reuse scientific libraries), and **Rust** for the License‑Compliance Service (for safety and performance).  
+
+All services will be containerised with **Docker**, orchestrated by **Kubernetes**, and deployed via **GitHub Actions** pipelines.  
 
 ---
 
 ## 3. System Topology  
 
-```mermaid
-graph LR
-    subgraph Frontend
-        UI[Web UI (React/Next.js)]
-    end
+```
++-------------------+          +-------------------+          +-------------------+
+|   API Gateway     | <------> | Authentication    | <------> |   Identity Store  |
+| (NGINX + Node.js) |  HTTPS   | Service (Go)      |  JWT     | (PostgreSQL)      |
++-------------------+          +-------------------+          +-------------------+
+        |   ^                         |   ^                         |
+        |   |                         |   |                         |
+        |   |                         |   |                         |
+        v   |                         v   |                         v
++-------------------+          +-------------------+          +-------------------+
+| Budget Estimation | <------> | License Compliance| <------> |  Artifact Repo   |
+| Service (Python) |  HTTPS   | Service (Rust)    |  HTTPS   | (GitHub)          |
++-------------------+          +-------------------+          +-------------------+
 
-    subgraph API_Gateway
-        GW[API Gateway (Kong/Traefik)]
-    end
-
-    subgraph Services
-        LEG[Legal Document Service]
-        FIN[Financial Statement Service]
-        REG[Business Registration Service]
-        MENU[Menu Management Service]
-        INV[Inventory Management Service]
-    end
-
-    subgraph Shared_Infra
-        DB[(PostgreSQL Cluster)]
-        OBJ[(Object Store – S3/GCS)]
-        AUTH[Auth Service (JWT)]
-        MON[Monitoring & Logging]
-    end
-
-    UI --> GW
-    GW --> LEG
-    GW --> FIN
-    GW --> REG
-    GW --> MENU
-    GW --> INV
-    GW --> AUTH
-
-    LEG --> DB
-    FIN --> DB
-    REG --> DB
-    MENU --> DB
-    INV --> DB
-
-    LEG --> OBJ
-    FIN --> OBJ
-    REG --> OBJ
-    MENU --> OBJ
-    INV --> OBJ
-
-    AUTH --> DB
-    MON --> DB
-    MON --> OBJ
+Legend:
+ • All inter‑service traffic uses mTLS (mutual TLS) for confidentiality & integrity.
+ • API‑Gateway also performs request‑level rate‑limiting, logging, and tracing.
 ```
 
-*All services are containerised, deployed to a Kubernetes cluster, and exposed through a single API‑gateway that handles routing, rate‑limiting, and TLS termination.*
+### External Actors  
+
+| Actor                | Interaction                                                                 |
+|----------------------|-----------------------------------------------------------------------------|
+| **Client Application** | Calls the API‑Gateway (`/v1/...`) with a JWT in the `Authorization` header. |
+| **CI/CD System**       | Pushes Docker images, runs integration tests, and updates Helm charts.      |
+| **Ops / SRE**          | Monitors metrics (Prometheus), logs (ELK), and traces (Jaeger).             |
 
 ---
 
-## 4. Component Boundaries & Seams  
+## 4. Component Seams (Interfaces)  
 
-| Service | Primary Responsibility | Public API End‑points (Seams) |
-|---------|------------------------|------------------------------|
-| **Legal Document Service** | CRUD for legal artefacts, versioning, PDF generation | `GET /legal-documents`, `POST /legal-documents`, `GET /legal-documents/{id}`, `PUT /legal-documents/{id}`, `DELETE /legal-documents/{id}` |
-| **Financial Statement Service** | Create & store balance‑sheet, P&L, cash‑flow; run simple calculations (break‑even) | `GET /financial-statements`, `POST /financial-statements`, `GET /financial-statements/{id}`, `PUT /financial-statements/{id}` |
-| **Business Registration Service** | Capture registration data, generate licence checklists, store lease agreements | `GET /registrations`, `POST /registrations`, `GET /registrations/{id}` |
-| **Menu Management Service** | Define menu items, categories, pricing, seasonal offers | `GET /menus`, `POST /menus`, `GET /menus/{id}`, `PUT /menus/{id}`, `DELETE /menus/{id}` |
-| **Inventory Management Service** | Track stock levels, create purchase orders, low‑stock alerts | `GET /inventory`, `POST /inventory`, `PUT /inventory/{id}`, `GET /inventory/low-stock` |
+| From → To                     | Protocol | Endpoint (example)                | Payload / Contract                              |
+|-------------------------------|----------|-----------------------------------|-------------------------------------------------|
+| **Gateway → Auth Service**    | HTTPS    | `POST /auth/login`                | `{username, password}` → `{access_token, exp}` |
+| **Gateway → Auth Service**    | HTTPS    | `GET /auth/validate` (internal)  | `Authorization: Bearer <jwt>` → `{sub, roles}` |
+| **Gateway → Budget Service**  | HTTPS    | `POST /budget/estimate`           | `{projectId, parameters}` → `{estimate}`      |
+| **Gateway → License Service** | HTTPS    | `POST /license/check`             | `{repoUrl, commitSha}` → `{compliant, details}`|
+| **Auth Service → Identity DB**| SQL (TLS)| `SELECT * FROM users WHERE ...`   | N/A (internal)                                 |
+| **Budget Service → Data Store**| HTTPS   | `GET /data/project/{id}`          | N/A (read‑only)                                 |
+| **License Service → Artifact Repo**| HTTPS| `GET /repos/{owner}/{repo}/contents/LICENSE` | N/A (read‑only)                                 |
 
-All services share a **common error model** and **authentication/authorization** via JWT passed in the `Authorization: Bearer <token>` header.
+All seams are versioned (`/v1/…`) and documented in an **OpenAPI 3.1** spec stored under `docs/openapi/`.
 
 ---
 
-## 5. Directory Structure (Repository Layout)
+## 5. Directory Structure  
 
 ```
-cafe-startup-platform/
-├─ .github/                # GitHub Actions CI/CD pipelines
-│   └─ workflows/
-│       └─ ci.yml
-├─ infra/                  # Terraform IaC
-│   ├─ main.tf
-│   └─ variables.tf
+/project-root
+│
+├─ LICENSE                     # MIT license text
+├─ NOTICE                      # Attribution notice (optional)
+├─ README.md
 ├─ docs/
-│   └─ architecture.md     # This ADR + diagrams
-├─ services/
-│   ├─ legal-documents/
-│   │   ├─ src/
-│   │   │   ├─ controllers/
-│   │   │   ├─ models/
-│   │   │   └─ routes/
-│   │   ├─ Dockerfile
-│   │   └─ openapi.yaml
-│   ├─ financial-statements/
-│   │   └─ … (same layout)
-│   ├─ business-registration/
-│   │   └─ …
-│   ├─ menu-management/
-│   │   └─ …
-│   └─ inventory-management/
-│       └─ …
-├─ gateway/
+│   └─ openapi/
+│        ├─ gateway.yaml
+│        ├─ auth.yaml
+│        ├─ budget.yaml
+│        └─ license.yaml
+│
+├─ helm/
+│   └─ chart/                  # Helm chart for full stack deployment
+│
+├─ .github/
+│   └─ workflows/
+│        └─ ci-cd.yml
+│
+├─ api-gateway/
 │   ├─ Dockerfile
-│   └─ kong.yaml          # or Traefik config
-├─ ui/
-│   ├─ package.json
-│   └─ src/
-│       └─ … (React/Next.js)
-└─ README.md
+│   ├─ src/
+│   │   ├─ index.ts
+│   │   ├─ routes/
+│   │   │   ├─ auth.ts
+│   │   │   ├─ budget.ts
+│   │   │   └─ license.ts
+│   │   └─ middleware/
+│   │        ├─ jwt.ts
+│   │        └─ rateLimiter.ts
+│   └─ tsconfig.json
+│
+├─ authentication-service/
+│   ├─ Dockerfile
+│   ├─ cmd/
+│   │   └─ server/main.go
+│   ├─ internal/
+│   │   ├─ auth/
+│   │   ├─ jwt/
+│   │   └─ storage/
+│   └─ go.mod
+│
+├─ budget-estimation-service/
+│   ├─ Dockerfile
+│   ├─ app/
+│   │   ├─ main.py
+│   │   ├─ routers/
+│   │   │   └─ budget.py
+│   │   └─ models/
+│   │        └─ estimation.py
+│   ├─ requirements.txt
+│   └─ pyproject.toml
+│
+└─ license-compliance-service/
+    ├─ Dockerfile
+    ├─ src/
+    │   ├─ main.rs
+    │   ├─ handlers/
+    │   │   └─ check.rs
+    │   └─ lib/
+    │        └─ mit.rs
+    └─ Cargo.toml
 ```
 
-*Each service is a **stand‑alone** repo‑folder that can be built, tested, and deployed independently.*
+*Each microservice is a **first‑class citizen** with its own CI pipeline, Dockerfile, and Helm sub‑chart.*  
 
 ---
 
-## 6. API Contracts (OpenAPI 3.0 snippets)
+## 6. API Contracts (OpenAPI snippets)
 
-Below are the **complete OpenAPI definitions** for each service (full files live under `services/<service>/openapi.yaml`). Only the most relevant parts are reproduced here for brevity.
+Below are minimal OpenAPI 3.1 excerpts for each public endpoint. Full specs live in `docs/openapi/*.yaml`.
 
-### 6.1 Legal Document Management API  
+### 6.1 API‑Gateway (`gateway.yaml`)
 
 ```yaml
-openapi: 3.0.0
+openapi: 3.1.0
 info:
-  title: Legal Document Management API
+  title: Secure Microservice API – Gateway
   version: 1.0.0
-  description: CRUD operations for legal artefacts required to open a café.
 servers:
-  - url: https://api.cafe.example.com/legal-documents
+  - url: https://api.example.com/v1
 paths:
-  /:
-    get:
-      summary: List all legal documents
-      security:
-        - bearerAuth: []
-      responses:
-        '200':
-          description: Array of documents
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/LegalDocument'
+  /auth/login:
     post:
-      summary: Create a new legal document
-      security:
-        - bearerAuth: []
+      summary: Obtain JWT token
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/NewLegalDocument'
-      responses:
-        '201':
-          description: Document created
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/LegalDocument'
-  /{id}:
-    parameters:
-      - name: id
-        in: path
-        required: true
-        schema:
-          type: string
-    get:
-      summary: Retrieve a single document
-      security:
-        - bearerAuth: []
+              $ref: '#/components/schemas/LoginRequest'
       responses:
         '200':
-          description: Document object
+          description: JWT token
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/LegalDocument'
-    put:
-      summary: Update a document (metadata only – file upload handled via signed URL)
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: Invalid credentials
+  /budget/estimate:
+    post:
       security:
         - bearerAuth: []
+      summary: Estimate project budget
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UpdateLegalDocument'
+              $ref: '#/components/schemas/BudgetRequest'
       responses:
         '200':
-          description: Updated document
-    delete:
-      summary: Delete a document
+          description: Budget estimate
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BudgetResponse'
+        '401':
+          description: Unauthorized
+  /license/check:
+    post:
       security:
         - bearerAuth: []
+      summary: Verify MIT‑license compliance
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LicenseCheckRequest'
       responses:
-        '204':
-          description: No Content
+        '200':
+          description: Compliance result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LicenseCheckResponse'
 components:
   securitySchemes:
     bearerAuth:
@@ -241,218 +226,158 @@ components:
       scheme: bearer
       bearerFormat: JWT
   schemas:
-    LegalDocument:
+    LoginRequest:
       type: object
-      required: [id, name, type, url, createdAt]
+      required: [username, password]
       properties:
-        id:
-          type: string
-          format: uuid
-        name:
-          type: string
-        type:
-          type: string
-          enum: [CompanyRegistration, FoodLicense, HealthPermit, LeaseAgreement, EmploymentContract]
-        url:
-          type: string
-          format: uri
-          description: Signed URL to the PDF stored in object storage
-        createdAt:
-          type: string
-          format: date-time
-        version:
-          type: integer
-    NewLegalDocument:
-      type: object
-      required: [name, type, contentBase64]
-      properties:
-        name:
-          type: string
-        type:
-          type: string
-          enum: [CompanyRegistration, FoodLicense, HealthPermit, LeaseAgreement, EmploymentContract]
-        contentBase64:
-          type: string
-          format: byte
-          description: Base64‑encoded PDF (alternative to signed‑URL upload)
-    UpdateLegalDocument:
+        username: {type: string}
+        password: {type: string}
+    LoginResponse:
       type: object
       properties:
-        name:
-          type: string
-        version:
-          type: integer
-```
-
-### 6.2 Financial Statement Management API  
-
-```yaml
-openapi: 3.0.0
-info:
-  title: Financial Statement Management API
-  version: 1.0.0
-  description: Create, retrieve and compute basic financial reports for the café.
-servers:
-  - url: https://api.cafe.example.com/financial-statements
-paths:
-  /:
-    get:
-      summary: List all statements
-      security:
-        - bearerAuth: []
-      responses:
-        '200':
-          description: Array of statements
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/FinancialStatement'
-    post:
-      summary: Create a new statement (balance sheet, P&L, cash‑flow)
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/NewFinancialStatement'
-      responses:
-        '201':
-          description: Statement created
-  /{id}:
-    parameters:
-      - name: id
-        in: path
-        required: true
-        schema:
-          type: string
-    get:
-      summary: Retrieve a specific statement
-      security:
-        - bearerAuth: []
-      responses:
-        '200':
-          description: Statement object
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/FinancialStatement'
-    put:
-      summary: Update a statement (e.g., after month‑end close)
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UpdateFinancialStatement'
-      responses:
-        '200':
-          description: Updated statement
-components:
-  securitySchemes:
-    bearerAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
-  schemas:
-    FinancialStatement:
+        access_token: {type: string}
+        expires_in: {type: integer}
+    BudgetRequest:
       type: object
-      required: [id, period, type, data, createdAt]
+      required: [projectId, parameters]
       properties:
-        id:
-          type: string
-          format: uuid
-        period:
-          type: string
-          example: "2024-03"
-        type:
-          type: string
-          enum: [BalanceSheet, ProfitAndLoss, CashFlow]
-        data:
+        projectId: {type: string}
+        parameters:
           type: object
-          description: Free‑form key/value pairs (e.g., revenue, expenses)
-        createdAt:
-          type: string
-          format: date-time
-    NewFinancialStatement:
+          additionalProperties: true
+    BudgetResponse:
       type: object
-      required: [period, type, data]
       properties:
-        period:
-          type: string
-        type:
-          type: string
-          enum: [BalanceSheet, ProfitAndLoss, CashFlow]
-        data:
+        estimate: {type: number, format: double}
+        currency: {type: string, example: USD}
+    LicenseCheckRequest:
+      type: object
+      required: [repoUrl, commitSha]
+      properties:
+        repoUrl: {type: string, format: uri}
+        commitSha: {type: string, pattern: '^[a-f0-9]{40}$'}
+    LicenseCheckResponse:
+      type: object
+      properties:
+        compliant: {type: boolean}
+        details: {type: string}
+```
+
+### 6.2 Authentication Service (`auth.yaml`)
+
+```yaml
+openapi: 3.1.0
+info:
+  title: Authentication Service
+  version: 1.0.0
+paths:
+  /auth/login:
+    post:
+      summary: Validate credentials and issue JWT
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: JWT token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: Invalid credentials
+components:
+  schemas:
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username: {type: string}
+        password: {type: string}
+    LoginResponse:
+      type: object
+      properties:
+        access_token: {type: string}
+        expires_in: {type: integer}
+```
+
+### 6.3 Budget Estimation Service (`budget.yaml`)
+
+```yaml
+openapi: 3.1.0
+info:
+  title: Budget Estimation Service
+  version: 1.0.0
+paths:
+  /budget/estimate:
+    post:
+      security:
+        - bearerAuth: []
+      summary: Compute a cost estimate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BudgetRequest'
+      responses:
+        '200':
+          description: Estimate result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BudgetResponse'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    BudgetRequest:
+      type: object
+      required: [projectId, parameters]
+      properties:
+        projectId: {type: string}
+        parameters:
           type: object
-    UpdateFinancialStatement:
+          additionalProperties: true
+    BudgetResponse:
       type: object
       properties:
-        data:
-          type: object
+        estimate: {type: number, format: double}
+        currency: {type: string}
 ```
 
-### 6.3 Business Registration API  
+### 6.4 License‑Compliance Service (`license.yaml`)
 
 ```yaml
-openapi: 3.0.0
+openapi: 3.1.0
 info:
-  title: Business Registration API
+  title: License Compliance Service
   version: 1.0.0
-  description: Capture registration details, generate licence check‑lists, store lease agreements.
-servers:
-  - url: https://api.cafe.example.com/registrations
 paths:
-  /:
-    get:
-      summary: List all registrations (normally one per entity)
-      security:
-        - bearerAuth: []
-      responses:
-        '200':
-          description: Array of registrations
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Registration'
+  /license/check:
     post:
-      summary: Submit a new registration request
       security:
         - bearerAuth: []
+      summary: Verify that a repo’s code is MIT‑licensed
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/NewRegistration'
-      responses:
-        '201':
-          description: Registration created
-  /{id}:
-    parameters:
-      - name: id
-        in: path
-        required: true
-        schema:
-          type: string
-    get:
-      summary: Retrieve a registration record
-      security:
-        - bearerAuth: []
+              $ref: '#/components/schemas/LicenseCheckRequest'
       responses:
         '200':
-          description: Registration object
+          description: Compliance result
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Registration'
+                $ref: '#/components/schemas/LicenseCheckResponse'
 components:
   securitySchemes:
     bearerAuth:
@@ -460,386 +385,105 @@ components:
       scheme: bearer
       bearerFormat: JWT
   schemas:
-    Registration:
+    LicenseCheckRequest:
       type: object
-      required: [id, companyName, address, status, createdAt]
+      required: [repoUrl, commitSha]
       properties:
-        id:
-          type: string
-          format: uuid
-        companyName:
-          type: string
-        address:
-          type: string
-        status:
-          type: string
-          enum: [Draft, Submitted, Approved, Rejected]
-        createdAt:
-          type: string
-          format: date-time
-        requiredLicences:
-          type: array
-          items:
-            type: string
-            enum: [FoodLicense, HealthPermit, FireSafety, GSTRegistration]
-    NewRegistration:
-      type: object
-      required: [companyName, address]
-      properties:
-        companyName:
-          type: string
-        address:
-          type: string
-        contactPerson:
-          type: string
-        contactPhone:
-          type: string
-```
-
-### 6.4 Menu Management API  
-
-```yaml
-openapi: 3.0.0
-info:
-  title: Menu Management API
-  version: 1.0.0
-  description: CRUD for menu items, categories, and pricing.
-servers:
-  - url: https://api.cafe.example.com/menus
-paths:
-  /:
-    get:
-      summary: List all menu items (optionally filter by category)
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: category
-          in: query
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Array of menu items
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/MenuItem'
-    post:
-      summary: Add a new menu item
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/NewMenuItem'
-      responses:
-        '201':
-          description: Item created
-  /{id}:
-    parameters:
-      - name: id
-        in: path
-        required: true
-        schema:
-          type: string
-    get:
-      summary: Get a single menu item
-      security:
-        - bearerAuth: []
-      responses:
-        '200':
-          description: Menu item
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/MenuItem'
-    put:
-      summary: Update a menu item
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UpdateMenuItem'
-      responses:
-        '200':
-          description: Updated item
-    delete:
-      summary: Remove a menu item (soft‑delete)
-      security:
-        - bearerAuth: []
-      responses:
-        '204':
-          description: No Content
-components:
-  securitySchemes:
-    bearerAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
-  schemas:
-    MenuItem:
-      type: object
-      required: [id, name, price, category, active]
-      properties:
-        id:
-          type: string
-          format: uuid
-        name:
-          type: string
-        description:
-          type: string
-        price:
-          type: number
-          format: float
-        category:
-          type: string
-          enum: [Beverage, Snack, Meal, Dessert]
-        active:
-          type: boolean
-        createdAt:
-          type: string
-          format: date-time
-    NewMenuItem:
-      type: object
-      required: [name, price, category]
-      properties:
-        name:
-          type: string
-        description:
-          type: string
-        price:
-          type: number
-          format: float
-        category:
-          type: string
-    UpdateMenuItem:
+        repoUrl: {type: string, format: uri}
+        commitSha: {type: string}
+    LicenseCheckResponse:
       type: object
       properties:
-        name:
-          type: string
-        description:
-          type: string
-        price:
-          type: number
-        category:
-          type: string
-        active:
-          type: boolean
-```
-
-### 6.5 Inventory Management API  
-
-```yaml
-openapi: 3.0.0
-info:
-  title: Inventory Management API
-  version: 1.0.0
-  description: Track stock levels, create purchase orders, and receive low‑stock alerts.
-servers:
-  - url: https://api.cafe.example.com/inventory
-paths:
-  /items:
-    get:
-      summary: List inventory items (filterable)
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: lowStock
-          in: query
-          schema:
-            type: boolean
-      responses:
-        '200':
-          description: Array of inventory items
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/InventoryItem'
-    post:
-      summary: Add a new inventory SKU
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/NewInventoryItem'
-      responses:
-        '201':
-          description: Item created
-  /items/{id}:
-    parameters:
-      - name: id
-        in: path
-        required: true
-        schema:
-          type: string
-    get:
-      summary: Get details for a single SKU
-      security:
-        - bearerAuth: []
-      responses:
-        '200':
-          description: Inventory item
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/InventoryItem'
-    put:
-      summary: Update quantity / details
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UpdateInventoryItem'
-      responses:
-        '200':
-          description: Updated item
-  /orders:
-    post:
-      summary: Create a purchase order (auto‑generated when low‑stock threshold crossed)
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/NewPurchaseOrder'
-      responses:
-        '201':
-          description: PO created
-components:
-  securitySchemes:
-    bearerAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
-  schemas:
-    InventoryItem:
-      type: object
-      required: [id, sku, name, quantity, unit, lowStockThreshold]
-      properties:
-        id:
-          type: string
-          format: uuid
-        sku:
-          type: string
-        name:
-          type: string
-        quantity:
-          type: number
-        unit:
-          type: string
-          enum: [kg, litre, piece, pack]
-        lowStockThreshold:
-          type: number
-        lastUpdated:
-          type: string
-          format: date-time
-    NewInventoryItem:
-      type: object
-      required: [sku, name, quantity, unit, lowStockThreshold]
-      properties:
-        sku:
-          type: string
-        name:
-          type: string
-        quantity:
-          type: number
-        unit:
-          type: string
-        lowStockThreshold:
-          type: number
-    UpdateInventoryItem:
-      type: object
-      properties:
-        quantity:
-          type: number
-        lowStockThreshold:
-          type: number
-    NewPurchaseOrder:
-      type: object
-      required: [items, supplier]
-      properties:
-        supplier:
-          type: string
-        items:
-          type: array
-          items:
-            type: object
-            required: [sku, quantity]
-            properties:
-              sku:
-                type: string
-              quantity:
-                type: number
+        compliant: {type: boolean}
+        details: {type: string}
 ```
 
 ---
 
-## 7. Rationale & Trade‑offs  
+## 7. Non‑Functional Requirements (NFRs) Addressed  
 
-| Aspect | Chosen Approach | Alternatives Considered | Why the chosen approach wins |
-|--------|----------------|------------------------|------------------------------|
-| **Service granularity** | 5 bounded‑context services | One monolith; 10+ micro‑services | 5 services give clear domain separation while keeping ops overhead low. |
-| **Communication** | Synchronous REST/JSON | gRPC, Message Queues (Kafka) | REST is sufficient for CRUD‑heavy workloads; adds no extra client‑side complexity. |
-| **Data storage** | PostgreSQL per service (or shared DB with schemas) + S3 for binaries | NoSQL (MongoDB) | Relational DB gives ACID guarantees needed for financial/legal data. |
-| **Auth** | JWT issued by a future Auth Service (OAuth2) | Session cookies, API keys | JWT is stateless, works across services, easy to integrate with API‑gateway. |
-| **Deployment** | Docker + Kubernetes (managed) | Serverless (AWS Lambda) | K8s gives fine‑grained resource control and is a good learning platform for the client’s future scaling. |
-| **CI/CD** | GitHub Actions + Docker BuildKit | Jenkins, GitLab CI | GitHub Actions is native to the repo host, low‑maintenance, and supports secret management. |
-| **Observability** | Loki + Grafana + Prometheus | Cloud‑provider proprietary logs | Open‑source stack is vendor‑agnostic and cheaper for a small startup. |
-
----
-
-## 8. Consequences  
-
-* **Positive**  
-  * Independent scaling – inventory may need more CPU than legal docs.  
-  * Teams (or a single developer) can work on one service without affecting others.  
-  * Clear API contracts enable future mobile/web clients or third‑party integrations (e.g., accounting software).  
-
-* **Negative / Mitigations**  
-  * **Operational overhead** – Kubernetes introduces complexity; mitigated by using a managed service (EKS/AKS/GKE).  
-  * **Network latency** – multiple HTTP hops; mitigated by colocating services in the same VPC and using HTTP/2 keep‑alive.  
-  * **Data consistency** – cross‑service transactions are not needed (each domain owns its data). If a future requirement emerges (e.g., a transaction that updates inventory *and* financials atomically), we can introduce a saga pattern.  
+| NFR                     | How it is satisfied                                                            |
+|-------------------------|--------------------------------------------------------------------------------|
+| **Security**            | - JWT signed with RS256 (asymmetric keys) <br>- mTLS between services <br>- Rate limiting & OWASP‑top‑10 mitigations in gateway |
+| **Scalability**         | Stateless services → horizontal scaling via Kubernetes Deployments & HPA |
+| **Observability**       | Prometheus metrics (`/metrics`), OpenTelemetry tracing, centralized logging (EFK) |
+| **Reliability**         | Liveness/readiness probes, circuit‑breaker (Resilience4j) in gateway, graceful shutdown |
+| **Maintainability**     | Separate repos per service, clear module boundaries, OpenAPI contracts, CI linting |
+| **Portability**         | Docker + Helm → deployable on any K8s‑compatible cloud (EKS, GKE, AKS, on‑prem) |
+| **Compliance**          | MIT license file at repo root, SPDX identifier in `package.json`, `Cargo.toml`, `go.mod`, `pyproject.toml` |
+| **Performance**         | Go & Rust services for crypto‑heavy paths; FastAPI for numeric estimation; async I/O in gateway |
 
 ---
 
-## 9. Next Steps  
+## 8. Decision Rationale  
 
-1. **Bootstrap the repo** with the directory layout above.  
-2. **Create Terraform modules** for the PostgreSQL cluster, S3 bucket, and EKS cluster.  
-3. **Implement the Legal Document Service** (fastest MVP – most paperwork).  
-4. **Add CI pipeline** that runs `openapi-generator` to produce a TypeScript client for the UI.  
-5. **Iterate** through the remaining services, adding unit/integration tests and Swagger UI for each.  
-6. **Build the React/Next.js UI** that consumes the generated client libraries.  
+| Option | Pros | Cons | Reason for Rejection |
+|--------|------|------|----------------------|
+| **Monolith (single codebase)** | Simpler dev setup | Hard to scale, single point of failure, difficult to enforce per‑service security policies | Violates scalability & isolation goals |
+| **All services in same language (e.g., Node.js)** | Uniform tooling | Misses opportunity to use best‑fit languages for crypto (Go) and scientific computing (Python) | Reduces productivity for domain‑specific tasks |
+| **gRPC for all inter‑service calls** | Efficient binary protocol | Increases operational complexity, harder for external clients to test via curl/Postman | REST/HTTPS already sufficient; gRPC optional for future high‑throughput paths |
+| **Serverless (AWS Lambda)** | Zero‑ops infra | Cold‑start latency for JWT verification, limited control over mTLS, harder to enforce MIT‑license compliance across layers | Not aligned with strict security & observability requirements |
+
+**Chosen approach** (microservices with REST/HTTPS) best balances **security, performance, developer productivity, and operational simplicity** while meeting all functional and non‑functional requirements.
 
 ---
 
-## 10. References  
+## 9. Implementation Roadmap  
 
-* **Microservice Patterns** – Chris Richardson, 2022.  
-* **OpenAPI Specification v3.0.3** – https://spec.openapis.org/oas/v3.0.3  
-* **12‑Factor App** – https://12factor.net/  
-* **AWS Well‑Architected Framework** – Security, Reliability, Performance, Cost‑Optimization.  
+| Sprint | Deliverable |
+|--------|-------------|
+| **Sprint 1** | Scaffold repo, create Dockerfiles, CI pipelines, and basic Helm chart. |
+| **Sprint 2** | Implement Authentication Service (login, JWT issuance, key rotation). |
+| **Sprint 3** | Build API‑Gateway with JWT validation, rate‑limiting, and routing. |
+| **Sprint 4** | Develop Budget Estimation Service (simple linear model). |
+| **Sprint 5** | Implement License‑Compliance Service (fetch LICENSE file, verify MIT SPDX identifier). |
+| **Sprint 6** | Add observability (Prometheus exporters, OpenTelemetry tracing). |
+| **Sprint 7** | End‑to‑end security hardening (mTLS, secret management via Vault). |
+| **Sprint 8** | Load‑testing, performance tuning, documentation finalisation, release. |
+
+---
+
+## 10. MIT License Compliance Checklist  
+
+- **Root `LICENSE` file** containing the full MIT text.  
+- **`NOTICE` file** (optional) for attribution of third‑party libraries.  
+- Each language package manifest includes the SPDX identifier:  
+
+  ```json
+  // package.json
+  "license": "MIT"
+  ```
+
+  ```toml
+  # Cargo.toml
+  license = "MIT"
+  ```
+
+  ```go
+  // go.mod
+  // SPDX-License-Identifier: MIT
+  ```
+
+- CI step verifies that every source file contains the SPDX header (via `reuse lint`).  
+
+---
+
+## 11. Open Issues / Future Considerations  
+
+1. **API versioning strategy** – currently `v1` in path; may evolve to header‑based versioning.  
+2. **Refresh‑token flow** – not in scope now; could be added later.  
+3. **Multi‑tenant isolation** – future requirement may need per‑tenant databases or namespaces.  
+4. **GraphQL façade** – optional for clients needing flexible queries.  
+
+---
+
+## 12. References  
+
+- **RFC 7519** – JSON Web Token (JWT)  
+- **OpenAPI Specification 3.1** – https://spec.openapis.org/oas/v3.1.0  
+- **MIT License** – https://opensource.org/licenses/MIT  
+- **OWASP API Security Top 10** – https://owasp.org/www-project-api-security/  
 
 ---  
 
-*Prepared by:* **Principal Software Architect**  
-*Date:* 2026‑09‑15  
-
----  
+*End of Architecture Decision Record.*

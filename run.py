@@ -5,17 +5,25 @@ import time
 import signal
 from pathlib import Path
 
+try:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
+
 ROOT = Path(__file__).resolve().parent
 BACKEND_DIR = ROOT / "backend"
 FRONTEND_DIR = ROOT / "frontend"
 
 def main():
     print("=" * 60)
-    print("🚀 STARTING POLYMAN MULTI-AGENT PLATFORM")
+    print(">> STARTING POLYMAN MULTI-AGENT PLATFORM")
     print("=" * 60)
-    print(f"📁 Workspace Root : {ROOT}")
-    print("🌐 Backend API     : http://127.0.0.1:8000")
-    print("💻 Frontend UI     : http://localhost:5173")
+    print(f"[*] Workspace Root : {ROOT}")
+    print("[*] Backend API     : http://127.0.0.1:8000")
+    print("[*] Frontend UI     : http://localhost:5173")
     print("=" * 60)
 
     # 1. Start backend server
@@ -35,7 +43,7 @@ def main():
         cwd=str(FRONTEND_DIR)
     )
 
-    print("\n✅ Polyman is running! Open http://localhost:5173 in your browser.")
+    print("\n[+] Polyman is running! Open http://localhost:5173 in your browser.")
     print("Press Ctrl+C to stop both servers.\n")
 
     try:

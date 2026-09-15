@@ -432,7 +432,7 @@ async def db_create_agent(agent_data: Dict[str, Any]) -> Dict[str, Any]:
         "system_prompt": agent_data["system_prompt"],
         "default_provider": agent_data["default_provider"],
         "default_model": agent_data["default_model"],
-        "tools": agent_data.get("tools", []),
+        "tools": agent_data.get("tools") or [],
         "is_builtin": False
     }
 

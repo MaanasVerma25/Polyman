@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   FileText, 
   Scale, 
@@ -7,8 +7,8 @@ import {
   Layers, 
   Copy, 
   Check, 
-  RefreshCw,
-  Download
+  RefreshCw, 
+  Download 
 } from 'lucide-react';
 import type { ReportItem } from '../../types';
 
@@ -23,25 +23,26 @@ export const ReportsViewer: React.FC<ReportsViewerProps> = ({ apiBase }) => {
   const [copied, setCopied] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
 
-  const fetchReports = async () => {
+  const fetchReports = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch(`${apiBase}/api/projects/reports`);
       const data = await res.json();
-      setReports(data.reports || []);
-      if (data.reports && data.reports.length > 0 && !selectedReport) {
-        setSelectedReport(data.reports[0]);
+      const loadedReports: ReportItem[] = data.reports || [];
+      setReports(loadedReports);
+      if (loadedReports.length > 0) {
+        setSelectedReport(prev => prev || loadedReports[0]);
       }
     } catch (e) {
       console.error(e);
     } finally {
       setLoading(false);
     }
-  };
+  }, [apiBase]);
 
   useEffect(() => {
     fetchReports();
-  }, [apiBase]);
+  }, [fetchReports]);
 
   const copyToClipboard = () => {
     if (selectedReport) {
@@ -65,15 +66,15 @@ export const ReportsViewer: React.FC<ReportsViewerProps> = ({ apiBase }) => {
   const getCategoryMeta = (category: string) => {
     switch (category) {
       case 'legal':
-        return { label: 'Legal & License', icon: Scale, color: '#f59e0b', bg: 'var(--warning-bg)' };
+        return { label: 'Legal & License', icon: Scale, color: 'var(--warning)', bg: 'var(--warning-soft)' };
       case 'audit':
-        return { label: 'Security & Quality', icon: ShieldCheck, color: '#ef4444', bg: 'var(--danger-bg)' };
+        return { label: 'Security & Quality', icon: ShieldCheck, color: 'var(--danger)', bg: 'var(--danger-soft)' };
       case 'financial':
-        return { label: 'FinOps & Budget', icon: Calculator, color: '#8b5cf6', bg: 'var(--purple-bg)' };
+        return { label: 'FinOps & Budget', icon: Calculator, color: 'var(--purple)', bg: 'var(--purple-bg)' };
       case 'architecture':
-        return { label: 'System Design', icon: Layers, color: '#0ea5e9', bg: 'var(--info-bg)' };
+        return { label: 'System Design', icon: Layers, color: 'var(--info)', bg: 'var(--info-soft)' };
       default:
-        return { label: category, icon: FileText, color: '#64748b', bg: 'var(--bg-tertiary)' };
+        return { label: category, icon: FileText, color: 'var(--foreground-muted)', bg: 'var(--surface-control)' };
     }
   };
 
@@ -82,115 +83,138 @@ export const ReportsViewer: React.FC<ReportsViewerProps> = ({ apiBase }) => {
     : reports.filter(r => r.category === categoryFilter);
 
   return (
-    <div style={{
+    <div className="container" style={{
       display: 'grid',
-      gridTemplateColumns: '320px 1fr',
-      height: 'calc(100vh - 120px)',
-      gap: '20px',
-      padding: '20px 28px'
+      gridTemplateColumns: '300px 1fr',
+      height: 'calc(100vh - 100px)',
+      gap: '16px',
+      paddingTop: '20px',
+      paddingBottom: '20px'
     }}>
-      {/* Report List */}
-      <div style={{
-        backgroundColor: 'var(--bg-secondary)',
-        borderRadius: 'var(--radius)',
-        border: '1px solid var(--border-color)',
+      {/* Report List Sidebar */}
+      <div className="card" style={{
         display: 'flex',
         flexDirection: 'column',
-        overflow: 'hidden',
-        boxShadow: 'var(--shadow-sm)'
+        overflow: 'hidden'
       }}>
         <div style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '14px 18px',
-          borderBottom: '1px solid var(--border-color)',
-          backgroundColor: 'var(--bg-tertiary)'
+          padding: '12px 16px',
+          borderBottom: '1px solid var(--border)',
+          backgroundColor: 'var(--surface-muted)'
         }}>
-          <span style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>
+          <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--foreground)' }}>
             Deliverables Showcase
           </span>
-          <button onClick={fetchReports} title="Refresh Reports">
-            <RefreshCw size={15} color="var(--text-muted)" className={loading ? 'animate-spin' : ''} />
+          <button 
+            onClick={fetchReports} 
+            className="button-ghost"
+            style={{ width: '28px', height: '28px', padding: 0 }}
+            title="Refresh Deliverables"
+          >
+            <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
           </button>
         </div>
 
         {/* Filter Pills */}
-        <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--border-color)', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-          {['all', 'legal', 'audit', 'financial', 'architecture'].map(cat => (
-            <button
-              key={cat}
-              onClick={() => setCategoryFilter(cat)}
-              style={{
-                fontSize: '11px',
-                fontWeight: 600,
-                padding: '3px 8px',
-                borderRadius: '12px',
-                backgroundColor: categoryFilter === cat ? 'var(--accent-gradient)' : 'var(--bg-primary)',
-                color: categoryFilter === cat ? '#fff' : 'var(--text-secondary)',
-                border: '1px solid var(--border-color)',
-                textTransform: 'capitalize'
-              }}
-            >
-              {cat}
-            </button>
-          ))}
+        <div style={{ 
+          padding: '8px 12px', 
+          borderBottom: '1px solid var(--border)', 
+          display: 'flex', 
+          gap: '4px', 
+          flexWrap: 'wrap',
+          backgroundColor: 'var(--background-alternative)'
+        }}>
+          {['all', 'legal', 'audit', 'financial', 'architecture'].map(cat => {
+            const isActive = categoryFilter === cat;
+            return (
+              <button
+                key={cat}
+                onClick={() => setCategoryFilter(cat)}
+                className="button-ghost"
+                style={{
+                  fontSize: '11px',
+                  padding: '2px 8px',
+                  height: '24px',
+                  borderRadius: 'var(--radius-pill)',
+                  backgroundColor: isActive ? 'var(--brand)' : 'var(--surface)',
+                  color: isActive ? 'var(--brand-foreground)' : 'var(--foreground-secondary)',
+                  border: isActive ? '1px solid var(--brand)' : '1px solid var(--border)',
+                  fontWeight: isActive ? 600 : 500,
+                  textTransform: 'capitalize'
+                }}
+              >
+                {cat}
+              </button>
+            );
+          })}
         </div>
 
         {/* List items */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '10px' }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '6px' }}>
           {filteredReports.length === 0 ? (
-            <div style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
-              <FileText size={32} style={{ opacity: 0.3, margin: '0 auto 8px auto' }} />
-              No reports synthesized yet. Run an autonomous mission to generate documents.
+            <div style={{ padding: '24px', textAlign: 'center', color: 'var(--foreground-muted)', fontSize: '12px' }}>
+              No deliverables available for this filter.
             </div>
           ) : (
-            filteredReports.map((rep) => {
-              const meta = getCategoryMeta(rep.category);
-              const Icon = meta.icon;
-              const isSelected = selectedReport?.rel_path === rep.rel_path;
+            filteredReports.map((item) => {
+              const isSelected = selectedReport?.filename === item.filename;
+              const meta = getCategoryMeta(item.category);
+              const MetaIcon = meta.icon;
 
               return (
                 <div
-                  key={rep.rel_path}
-                  onClick={() => setSelectedReport(rep)}
+                  key={item.filename}
+                  onClick={() => setSelectedReport(item)}
                   style={{
-                    padding: '12px',
-                    borderRadius: '8px',
-                    backgroundColor: isSelected ? 'var(--accent-subtle)' : 'var(--bg-primary)',
-                    border: `1.5px solid ${isSelected ? 'var(--accent-primary)' : 'var(--border-color)'}`,
-                    marginBottom: '8px',
+                    padding: '8px 10px',
+                    borderRadius: 'var(--radius-sm)',
+                    backgroundColor: isSelected ? 'var(--brand-soft)' : 'transparent',
+                    borderLeft: isSelected ? '2px solid var(--brand)' : '2px solid transparent',
                     cursor: 'pointer',
-                    transition: 'all 0.18s ease',
-                    boxShadow: isSelected ? 'var(--shadow-sm)' : 'none'
+                    marginBottom: '2px',
+                    transition: 'background-color 160ms ease'
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                    <span style={{
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '3px' }}>
+                    <div style={{
+                      width: '20px',
+                      height: '20px',
+                      borderRadius: 'var(--radius-sm)',
+                      background: meta.bg,
+                      color: meta.color,
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '4px',
-                      fontSize: '10px',
-                      fontWeight: 700,
-                      padding: '2px 8px',
-                      borderRadius: '4px',
-                      backgroundColor: meta.bg,
-                      color: meta.color,
-                      textTransform: 'uppercase'
+                      justifyContent: 'center',
+                      border: '1px solid var(--border)'
                     }}>
-                      <Icon size={11} />
-                      {meta.label}
-                    </span>
-                    <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-                      .md
+                      <MetaIcon size={11} />
+                    </div>
+                    <span style={{
+                      fontSize: '12px',
+                      fontWeight: isSelected ? 600 : 500,
+                      color: isSelected ? 'var(--brand-dark)' : 'var(--foreground)',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap'
+                    }}>
+                      {item.filename}
                     </span>
                   </div>
-                  <h4 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
-                    {rep.filename}
-                  </h4>
-                  <p style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-                    {rep.rel_path}
-                  </p>
+
+                  <div style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'space-between', 
+                    fontSize: '10px', 
+                    color: 'var(--foreground-muted)', 
+                    paddingLeft: '26px' 
+                  }}>
+                    <span style={{ textTransform: 'capitalize' }}>{meta.label}</span>
+                    <span style={{ fontFamily: 'var(--font-mono)' }}>{item.filename}</span>
+                  </div>
                 </div>
               );
             })
@@ -198,15 +222,11 @@ export const ReportsViewer: React.FC<ReportsViewerProps> = ({ apiBase }) => {
         </div>
       </div>
 
-      {/* Report Reader */}
-      <div style={{
-        backgroundColor: 'var(--bg-secondary)',
-        borderRadius: 'var(--radius)',
-        border: '1px solid var(--border-color)',
+      {/* Deliverable Document Panel */}
+      <div className="card" style={{
         display: 'flex',
         flexDirection: 'column',
-        overflow: 'hidden',
-        boxShadow: 'var(--shadow-sm)'
+        overflow: 'hidden'
       }}>
         {selectedReport ? (
           <>
@@ -214,76 +234,79 @@ export const ReportsViewer: React.FC<ReportsViewerProps> = ({ apiBase }) => {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              padding: '14px 24px',
-              borderBottom: '1px solid var(--border-color)',
-              backgroundColor: 'var(--bg-tertiary)'
+              padding: '10px 16px',
+              borderBottom: '1px solid var(--border)',
+              backgroundColor: 'var(--surface-muted)'
             }}>
               <div>
-                <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--foreground)' }}>
+                    {selectedReport.filename}
+                  </span>
+                  <span className="status-pill info" style={{ fontSize: '10px' }}>
+                    {selectedReport.category.toUpperCase()}
+                  </span>
+                </div>
+                <div style={{ fontSize: '11px', color: 'var(--foreground-muted)', fontFamily: 'var(--font-mono)', marginTop: '2px' }}>
                   {selectedReport.filename}
-                </h3>
-                <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-                  Workspace Path: {selectedReport.rel_path}
-                </span>
+                </div>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <button
                   onClick={copyToClipboard}
+                  className="button-ghost"
                   style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    padding: '6px 14px',
-                    borderRadius: '6px',
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    backgroundColor: 'var(--bg-secondary)',
-                    border: '1px solid var(--border-color)',
-                    color: 'var(--text-primary)'
+                    height: '28px',
+                    padding: '0 8px',
+                    fontSize: '11px',
+                    border: '1px solid var(--border)',
+                    backgroundColor: 'var(--surface)'
                   }}
                 >
-                  {copied ? <Check size={14} color="var(--success)" /> : <Copy size={14} />}
-                  {copied ? 'Copied' : 'Copy'}
+                  {copied ? <Check size={11} style={{ color: 'var(--brand)' }} /> : <Copy size={11} />}
+                  <span>{copied ? 'Copied' : 'Copy'}</span>
                 </button>
 
                 <button
                   onClick={downloadReport}
+                  className="button-ghost"
                   style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    padding: '6px 14px',
-                    borderRadius: '6px',
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    background: 'var(--accent-gradient)',
-                    color: '#fff',
-                    boxShadow: '0 2px 8px rgba(124, 58, 237, 0.25)'
+                    height: '28px',
+                    padding: '0 8px',
+                    fontSize: '11px',
+                    border: '1px solid var(--border)',
+                    backgroundColor: 'var(--surface)'
                   }}
                 >
-                  <Download size={14} />
-                  Download
+                  <Download size={11} />
+                  <span>Download .md</span>
                 </button>
               </div>
             </div>
 
-            <div style={{ flex: 1, overflowY: 'auto', padding: '28px', backgroundColor: 'var(--bg-primary)' }}>
+            <div style={{
+              flex: 1,
+              overflowY: 'auto',
+              padding: '24px',
+              backgroundColor: 'var(--background)'
+            }}>
               <div style={{
-                maxWidth: '860px',
+                maxWidth: '780px',
                 margin: '0 auto',
-                backgroundColor: 'var(--bg-secondary)',
-                padding: '36px',
-                borderRadius: '12px',
-                border: '1px solid var(--border-color)',
-                boxShadow: 'var(--shadow-md)'
+                backgroundColor: 'var(--surface)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-md)',
+                padding: '24px 28px'
               }}>
                 <pre style={{
-                  fontFamily: 'inherit',
+                  fontFamily: 'var(--font-sans)',
                   fontSize: '13px',
-                  lineHeight: '1.7',
-                  color: 'var(--text-primary)',
-                  whiteSpace: 'pre-wrap'
+                  lineHeight: '1.65',
+                  color: 'var(--foreground)',
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-word',
+                  margin: 0
                 }}>
                   {selectedReport.content}
                 </pre>
@@ -291,8 +314,17 @@ export const ReportsViewer: React.FC<ReportsViewerProps> = ({ apiBase }) => {
             </div>
           </>
         ) : (
-          <div style={{ margin: 'auto', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
-            Select any report on the left panel to inspect full markdown content.
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            height: '100%',
+            color: 'var(--foreground-muted)',
+            gap: '8px'
+          }}>
+            <FileText size={32} style={{ opacity: 0.3 }} />
+            <span style={{ fontSize: '13px' }}>Select any deliverable to view its content.</span>
           </div>
         )}
       </div>

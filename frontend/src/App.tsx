@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   Play, 
   Pause, 
@@ -9,7 +9,8 @@ import {
   Layers,
   Zap,
   CheckCircle2,
-  Activity
+  Activity,
+  ArrowRight
 } from 'lucide-react';
 import { Navbar } from './components/layout/Navbar';
 import { DAGVisualizer } from './components/dag/DAGVisualizer';
@@ -26,8 +27,9 @@ const API_BASE = import.meta.env.VITE_API_BASE !== undefined
   : (import.meta.env.DEV ? 'http://127.0.0.1:8000' : '');
 
 export function App() {
+  // Light-first developer-product interface by default
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
-    return (localStorage.getItem('polyman-theme') as 'light' | 'dark') || 'dark';
+    return (localStorage.getItem('polyman-theme') as 'light' | 'dark') || 'light';
   });
   const [activeTab, setActiveTab] = useState<string>('mission');
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
@@ -55,6 +57,18 @@ export function App() {
     setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
   };
 
+  const fetchRecentRuns = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/runs?limit=5`);
+      if (res.ok) {
+        const data = await res.json();
+        setRecentRuns(data);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }, []);
+
   // Health check and initial data
   useEffect(() => {
     const checkEngine = async () => {
@@ -74,19 +88,7 @@ export function App() {
     fetchRecentRuns();
     const interval = setInterval(checkEngine, 10000);
     return () => clearInterval(interval);
-  }, []);
-
-  const fetchRecentRuns = async () => {
-    try {
-      const res = await fetch(`${API_BASE}/api/runs?limit=5`);
-      if (res.ok) {
-        const data = await res.json();
-        setRecentRuns(data);
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  };
+  }, [fetchRecentRuns]);
 
   // Connect Realtime (Supabase Realtime in production, WebSocket in local dev)
   useEffect(() => {
@@ -144,7 +146,6 @@ export function App() {
         )
         .subscribe();
 
-      // Poll periodically as safety net to refresh full status
       const pollInterval = setInterval(async () => {
         try {
           const res = await fetch(`${API_BASE}/api/runs/${activeRun.id}`);
@@ -159,22 +160,18 @@ export function App() {
             }
           }
         } catch {}
-      }, 3000);
+      }, 4000);
 
-      const sb = supabase;
       return () => {
-        if (sb) {
-          sb.removeChannel(channel);
+        if (supabase) {
+          supabase.removeChannel(channel);
         }
         clearInterval(pollInterval);
       };
     }
 
-    // 2. Fallback: Local dev WebSocket
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = API_BASE ? API_BASE.replace(/^https?:\/\//, '') : window.location.host;
-    const wsUrl = `${protocol}//${host}/api/runs/ws/${activeRun.id}`;
-    
+    // 2. Local fallback WebSocket
+    const wsUrl = API_BASE.replace(/^http/, 'ws') + `/api/ws/runs/${activeRun.id}`;
     let ws: WebSocket | null = null;
     try {
       ws = new WebSocket(wsUrl);
@@ -182,18 +179,16 @@ export function App() {
 
       ws.onmessage = (event) => {
         try {
-          const msg = JSON.parse(event.data);
-          const { type, data } = msg;
+          const message = JSON.parse(event.data);
+          const { type, data } = message;
 
-          if (type === 'DAG_CREATED') {
-            setDagNodes(data.nodes || []);
-          } else if (type === 'NODE_STARTED') {
-            setDagNodes(prev => prev.map(n => n.id === data.node_id ? { ...n, status: 'running' } : n));
-          } else if (type === 'NODE_COMPLETED') {
-            setDagNodes(prev => prev.map(n => n.id === data.node_id ? { ...n, status: 'completed', output_data: data.output } : n));
-          } else if (type === 'NODE_FAILED') {
-            setDagNodes(prev => prev.map(n => n.id === data.node_id ? { ...n, status: 'failed' } : n));
-          } else if (type.startsWith('AGENT_')) {
+          if (type === 'DAG_NODE_UPDATE') {
+            setDagNodes(prev => prev.map(n => n.id === data.node_id ? {
+              ...n,
+              status: data.status,
+              output_data: data.output_data
+            } : n));
+          } else if (type === 'AGENT_LOG') {
             setLogs(prev => [
               ...prev,
               {
@@ -222,7 +217,6 @@ export function App() {
       console.warn('Could not establish WebSocket connection, fallback polling enabled:', e);
     }
 
-    // Safety polling interval
     const pollInterval = setInterval(async () => {
       try {
         const res = await fetch(`${API_BASE}/api/runs/${activeRun.id}`);
@@ -243,7 +237,7 @@ export function App() {
       if (ws) ws.close();
       clearInterval(pollInterval);
     };
-  }, [activeRun?.id]);
+  }, [activeRun?.id, fetchRecentRuns]);
 
   const handleStartMission = async () => {
     if (!taskPrompt.trim() || isRunning) return;
@@ -274,14 +268,13 @@ export function App() {
       });
       setDagNodes(data.nodes || []);
 
-      // Trigger continuous execution worker (enables flawless execution on Vercel Serverless)
-      const triggerExecution = async (runId: string) => {
+      const triggerExecution = async (runId: string, depth = 0, maxDepth = 10) => {
         try {
           const execRes = await fetch(`${API_BASE}/api/runs/${runId}/execute`, { method: 'POST' });
           if (execRes.ok) {
             const execData = await execRes.json();
-            if (execData.continue) {
-              triggerExecution(runId);
+            if (execData.continue && depth < maxDepth) {
+              triggerExecution(runId, depth + 1, maxDepth);
             }
           }
         } catch (err) {
@@ -333,8 +326,10 @@ export function App() {
     { title: "Full Architecture Blueprint & ADR", prompt: "Create a modular React/Node feature with unit tests and Architecture Decision Record" }
   ];
 
+  const completedCount = dagNodes.filter(n => n.status === 'completed').length;
+
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--background)' }}>
       <Navbar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -345,159 +340,147 @@ export function App() {
         isEngineConnected={isEngineConnected}
       />
 
-      <main style={{ flex: 1 }}>
+      <main style={{ flex: 1, paddingBottom: '48px' }}>
         {activeTab === 'mission' && (
-          <div style={{ maxWidth: '1360px', margin: '0 auto', padding: '28px' }}>
-            {/* Stat Banner */}
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-              gap: '16px',
+          <div className="container" style={{ paddingTop: '32px' }}>
+            {/* Supabase-style Editorial Hero Area */}
+            <div style={{ marginBottom: '28px' }}>
+              <div style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontSize: '11px',
+                fontWeight: 600,
+                letterSpacing: '0.06em',
+                textTransform: 'uppercase',
+                color: 'var(--brand-dark)',
+                backgroundColor: 'var(--brand-soft)',
+                border: '1px solid var(--border)',
+                padding: '3px 10px',
+                borderRadius: 'var(--radius-pill)',
+                marginBottom: '12px'
+              }}>
+                <span>Autonomous Engineering System</span>
+                <ArrowRight size={11} />
+              </div>
+
+              <h1 className="hero-title" style={{ marginBottom: '10px' }}>
+                Multi-agent engineering <span className="accent">orchestration</span>
+              </h1>
+
+              <p className="body-copy" style={{ maxWidth: '640px' }}>
+                Decompose complex engineering objectives into a concurrent DAG pipeline. Specialized AI personas build code, audit vulnerabilities, verify licenses, and model FinOps costs simultaneously.
+              </p>
+            </div>
+
+            {/* Connected Technical Stat Grid */}
+            <div className="connected-grid" style={{
+              gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
               marginBottom: '24px'
             }}>
-              <div style={{
-                backgroundColor: 'var(--bg-secondary)',
-                border: '1px solid var(--border-color)',
-                borderRadius: 'var(--radius)',
-                padding: '16px 20px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '14px',
-                boxShadow: 'var(--shadow-sm)'
-              }}>
+              <div className="connected-grid-cell" style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                 <div style={{
-                  width: '38px',
-                  height: '38px',
-                  borderRadius: '10px',
-                  background: 'var(--accent-subtle)',
-                  color: 'var(--accent-primary)',
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: 'var(--radius-md)',
+                  background: 'var(--surface-control)',
+                  border: '1px solid var(--border)',
+                  color: 'var(--brand)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center'
                 }}>
-                  <Zap size={20} />
+                  <Zap size={18} />
                 </div>
                 <div>
-                  <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--foreground-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                     Active Subagents
                   </div>
-                  <div style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)' }}>
-                    6 Domain Personas
+                  <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--foreground)', fontFamily: 'var(--font-mono)' }}>
+                    6 Personas
                   </div>
                 </div>
               </div>
 
-              <div style={{
-                backgroundColor: 'var(--bg-secondary)',
-                border: '1px solid var(--border-color)',
-                borderRadius: 'var(--radius)',
-                padding: '16px 20px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '14px',
-                boxShadow: 'var(--shadow-sm)'
-              }}>
+              <div className="connected-grid-cell" style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                 <div style={{
-                  width: '38px',
-                  height: '38px',
-                  borderRadius: '10px',
-                  background: 'var(--info-bg)',
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: 'var(--radius-md)',
+                  background: 'var(--surface-control)',
+                  border: '1px solid var(--border)',
                   color: 'var(--info)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center'
                 }}>
-                  <Layers size={20} />
+                  <Layers size={18} />
                 </div>
                 <div>
-                  <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                    DAG Nodes
+                  <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--foreground-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    DAG Pipeline
                   </div>
-                  <div style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)' }}>
-                    {dagNodes.length} Pipeline Tasks
+                  <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--foreground)', fontFamily: 'var(--font-mono)' }}>
+                    {dagNodes.length} Tasks
                   </div>
                 </div>
               </div>
 
-              <div style={{
-                backgroundColor: 'var(--bg-secondary)',
-                border: '1px solid var(--border-color)',
-                borderRadius: 'var(--radius)',
-                padding: '16px 20px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '14px',
-                boxShadow: 'var(--shadow-sm)'
-              }}>
+              <div className="connected-grid-cell" style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                 <div style={{
-                  width: '38px',
-                  height: '38px',
-                  borderRadius: '10px',
-                  background: 'var(--success-bg)',
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: 'var(--radius-md)',
+                  background: 'var(--surface-control)',
+                  border: '1px solid var(--border)',
                   color: 'var(--success)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center'
                 }}>
-                  <CheckCircle2 size={20} />
+                  <CheckCircle2 size={18} />
                 </div>
                 <div>
-                  <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                    Completed
+                  <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--foreground-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    Deliverables
                   </div>
-                  <div style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)' }}>
-                    {dagNodes.filter(n => n.status === 'completed').length} / {dagNodes.length} Nodes
+                  <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--foreground)', fontFamily: 'var(--font-mono)' }}>
+                    {completedCount} / {dagNodes.length} Done
                   </div>
                 </div>
               </div>
 
-              <div style={{
-                backgroundColor: 'var(--bg-secondary)',
-                border: '1px solid var(--border-color)',
-                borderRadius: 'var(--radius)',
-                padding: '16px 20px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '14px',
-                boxShadow: 'var(--shadow-sm)'
-              }}>
+              <div className="connected-grid-cell" style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                 <div style={{
-                  width: '38px',
-                  height: '38px',
-                  borderRadius: '10px',
-                  background: 'var(--purple-bg)',
-                  color: 'var(--purple)',
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: 'var(--radius-md)',
+                  background: 'var(--surface-control)',
+                  border: '1px solid var(--border)',
+                  color: 'var(--brand)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center'
                 }}>
-                  <Activity size={20} />
+                  <Activity size={18} />
                 </div>
                 <div>
-                  <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                    Live Event Stream
+                  <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--foreground-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    Telemetry Stream
                   </div>
-                  <div style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)' }}>
-                    {logs.length} Telemetry Points
+                  <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--foreground)', fontFamily: 'var(--font-mono)' }}>
+                    {logs.length} Points
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Task Prompt Box with Glowing Border Accent */}
-            <div style={{
-              backgroundColor: 'var(--bg-secondary)',
-              border: '1px solid var(--border-color)',
-              borderRadius: '14px',
-              padding: '24px',
-              marginBottom: '24px',
-              boxShadow: 'var(--shadow-md)',
-              position: 'relative'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+            {/* Task Prompt Launchpad */}
+            <div className="card" style={{ padding: '20px 22px', marginBottom: '24px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Sparkles size={18} color="var(--accent-primary)" />
-                  <span style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                  <Sparkles size={16} style={{ color: 'var(--brand)' }} />
+                  <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--foreground)' }}>
                     Autonomous Mission Launchpad
                   </span>
                 </div>
@@ -507,47 +490,33 @@ export function App() {
                     <button
                       onClick={handlePauseResume}
                       disabled={!isRunning}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        padding: '6px 14px',
-                        borderRadius: '8px',
-                        fontSize: '12px',
-                        fontWeight: 600,
-                        backgroundColor: 'var(--bg-tertiary)',
-                        color: 'var(--text-primary)',
-                        opacity: !isRunning ? 0.5 : 1
-                      }}
+                      className="button-secondary"
+                      style={{ height: '30px', padding: '0 10px', fontSize: '12px' }}
                     >
-                      {isPaused ? <Play size={13} /> : <Pause size={13} />}
-                      {isPaused ? 'Resume Mission' : 'Pause'}
+                      {isPaused ? <Play size={12} /> : <Pause size={12} />}
+                      {isPaused ? 'Resume' : 'Pause'}
                     </button>
 
                     <button
                       onClick={handleAbort}
                       disabled={!isRunning}
+                      className="button-ghost"
                       style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        padding: '6px 14px',
-                        borderRadius: '8px',
+                        height: '30px',
+                        padding: '0 10px',
                         fontSize: '12px',
-                        fontWeight: 600,
-                        backgroundColor: 'var(--danger-bg)',
                         color: 'var(--danger)',
-                        opacity: !isRunning ? 0.5 : 1
+                        border: '1px solid var(--border)'
                       }}
                     >
-                      <Square size={13} />
+                      <Square size={12} />
                       Abort
                     </button>
                   </div>
                 )}
               </div>
 
-              {/* Textarea */}
+              {/* Input Area */}
               <div style={{ position: 'relative' }}>
                 <textarea
                   rows={3}
@@ -555,62 +524,49 @@ export function App() {
                   onChange={(e) => setTaskPrompt(e.target.value)}
                   placeholder="State your engineering goal (e.g. 'Build an encrypted user auth service with rate limiter, compliance terms, and cost estimation')..."
                   disabled={isRunning}
+                  className="textarea"
                   style={{
-                    width: '100%',
-                    padding: '14px 16px',
-                    fontSize: '14px',
-                    borderRadius: '10px',
-                    border: '1.5px solid var(--border-strong)',
-                    backgroundColor: 'var(--bg-primary)',
-                    color: 'var(--text-primary)',
-                    resize: 'none',
-                    lineHeight: '1.6'
+                    paddingRight: '140px',
+                    fontFamily: 'var(--font-sans)',
+                    fontSize: '14px'
                   }}
                 />
                 <button
                   onClick={handleStartMission}
                   disabled={isRunning || !taskPrompt.trim()}
+                  className="button-primary"
                   style={{
                     position: 'absolute',
-                    right: '12px',
-                    bottom: '14px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    background: 'var(--accent-gradient)',
-                    color: '#fff',
-                    padding: '9px 20px',
-                    borderRadius: '8px',
-                    fontSize: '13px',
-                    fontWeight: 700,
-                    boxShadow: '0 4px 14px rgba(124, 58, 237, 0.35)',
-                    opacity: (isRunning || !taskPrompt.trim()) ? 0.6 : 1
+                    right: '10px',
+                    bottom: '12px',
+                    minHeight: '34px',
+                    padding: '6px 14px',
+                    fontSize: '13px'
                   }}
                 >
-                  <Send size={14} />
-                  {isRunning ? 'Synthesizing DAG...' : 'Launch Agents'}
+                  <Send size={13} />
+                  {isRunning ? 'Synthesizing...' : 'Launch Agents'}
                 </button>
               </div>
 
               {/* Scenario chips */}
-              <div style={{ marginTop: '14px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>
-                  Curated Scenarios:
+              <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '11px', color: 'var(--foreground-muted)', fontWeight: 600, textTransform: 'uppercase' }}>
+                  Scenarios:
                 </span>
                 {suggestedScenarios.map((sc, i) => (
                   <button
                     key={i}
                     onClick={() => setTaskPrompt(sc.prompt)}
                     disabled={isRunning}
+                    className="button-ghost"
                     style={{
-                      fontSize: '12px',
-                      padding: '5px 12px',
-                      borderRadius: '20px',
-                      backgroundColor: 'var(--bg-primary)',
-                      border: '1px solid var(--border-color)',
-                      color: 'var(--text-secondary)',
-                      cursor: 'pointer',
-                      fontWeight: 500
+                      fontSize: '11px',
+                      padding: '3px 8px',
+                      borderRadius: 'var(--radius-pill)',
+                      backgroundColor: 'var(--surface-control)',
+                      border: '1px solid var(--border)',
+                      color: 'var(--foreground-secondary)'
                     }}
                   >
                     {sc.title}
@@ -623,26 +579,29 @@ export function App() {
                 <div style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '10px',
-                  marginTop: '16px',
+                  gap: '8px',
+                  marginTop: '14px',
                   paddingTop: '12px',
-                  borderTop: '1px solid var(--border-color)',
+                  borderTop: '1px solid var(--border)',
                   fontSize: '12px',
-                  color: 'var(--text-muted)'
+                  color: 'var(--foreground-muted)'
                 }}>
-                  <Clock size={13} />
-                  <span style={{ fontWeight: 600 }}>Recent Executions:</span>
-                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  <Clock size={12} />
+                  <span style={{ fontWeight: 500 }}>Recent Executions:</span>
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                     {recentRuns.map((r) => (
                       <button
                         key={r.id}
                         onClick={() => loadPreviousRun(r.id)}
+                        className="button-ghost"
                         style={{
                           fontSize: '11px',
-                          color: 'var(--accent-primary)',
+                          fontFamily: 'var(--font-mono)',
+                          color: 'var(--brand-dark)',
+                          backgroundColor: 'var(--brand-soft)',
+                          border: '1px solid var(--border)',
                           padding: '2px 8px',
-                          borderRadius: '4px',
-                          backgroundColor: 'var(--accent-subtle)'
+                          borderRadius: 'var(--radius-sm)'
                         }}
                       >
                         {r.task_prompt.length > 40 ? `${r.task_prompt.slice(0, 37)}...` : r.task_prompt}
@@ -654,11 +613,8 @@ export function App() {
             </div>
 
             {/* Main Mission Grid: DAG Canvas + Live Terminal */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '24px' }}>
-              {/* DAG Canvas */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '20px' }}>
               <DAGVisualizer nodes={dagNodes} />
-
-              {/* Streaming Live Logs */}
               <LiveLogViewer logs={logs} />
             </div>
           </div>

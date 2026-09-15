@@ -45,93 +45,91 @@ export const LiveLogViewer: React.FC<LiveLogViewerProps> = ({ logs }) => {
   const getEventBadge = (type: string) => {
     switch (type.toLowerCase()) {
       case 'thought':
-        return { label: 'Thought', icon: Lightbulb, color: '#f59e0b', bg: 'var(--warning-bg)' };
+        return { label: 'Thought', icon: Lightbulb, color: 'var(--warning)', bg: 'var(--warning-soft)' };
       case 'tool_call':
-        return { label: 'Action', icon: Wrench, color: '#0ea5e9', bg: 'var(--info-bg)' };
+        return { label: 'Action', icon: Wrench, color: 'var(--info)', bg: 'var(--info-soft)' };
       case 'tool_result':
-        return { label: 'Result', icon: Check, color: '#10b981', bg: 'var(--success-bg)' };
+        return { label: 'Result', icon: Check, color: 'var(--brand)', bg: 'var(--brand-soft)' };
       case 'output':
-        return { label: 'Deliverable', icon: MessageSquare, color: '#8b5cf6', bg: 'var(--purple-bg)' };
+        return { label: 'Deliverable', icon: MessageSquare, color: 'var(--purple)', bg: 'var(--purple-bg)' };
       case 'error':
-        return { label: 'Error', icon: AlertTriangle, color: '#ef4444', bg: 'var(--danger-bg)' };
+        return { label: 'Error', icon: AlertTriangle, color: 'var(--danger)', bg: 'var(--danger-soft)' };
       default:
-        return { label: 'System', icon: Terminal, color: '#94a3b8', bg: 'var(--bg-tertiary)' };
+        return { label: 'System', icon: Terminal, color: 'var(--foreground-muted)', bg: 'var(--surface-control)' };
     }
   };
 
   const getAgentColor = (role: string) => {
     switch (role.toLowerCase()) {
-      case 'architect': return '#0ea5e9';
-      case 'sde': return '#10b981';
-      case 'lawyer': return '#f59e0b';
-      case 'auditor': return '#ef4444';
-      case 'accountant': return '#8b5cf6';
-      case 'orchestrator': return '#6366f1';
-      default: return '#64748b';
+      case 'architect': return 'var(--info)';
+      case 'sde': return 'var(--brand)';
+      case 'lawyer': return 'var(--warning)';
+      case 'auditor': return 'var(--danger)';
+      case 'accountant': return 'var(--purple)';
+      case 'orchestrator': return 'var(--foreground)';
+      default: return 'var(--foreground-secondary)';
     }
   };
 
   return (
-    <div style={{
-      backgroundColor: 'var(--bg-secondary)',
-      borderRadius: 'var(--radius)',
-      border: '1px solid var(--border-color)',
+    <div className="card" style={{
       display: 'flex',
       flexDirection: 'column',
       height: '460px',
-      boxShadow: 'var(--shadow-md)',
       overflow: 'hidden'
     }}>
-      {/* Terminal Header */}
+      {/* Console Header */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: '12px 18px',
-        borderBottom: '1px solid var(--border-color)',
-        backgroundColor: 'var(--bg-tertiary)'
+        padding: '10px 16px',
+        borderBottom: '1px solid var(--border)',
+        backgroundColor: 'var(--surface-muted)'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <div style={{
-            width: '26px',
-            height: '26px',
-            borderRadius: '6px',
-            backgroundColor: 'var(--accent-subtle)',
-            color: 'var(--accent-primary)',
+            width: '24px',
+            height: '24px',
+            borderRadius: 'var(--radius-sm)',
+            backgroundColor: 'var(--surface-control)',
+            border: '1px solid var(--border)',
+            color: 'var(--brand)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center'
           }}>
-            <Terminal size={14} />
+            <Terminal size={13} />
           </div>
-          <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>
+          <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--foreground)' }}>
             Agent Execution Feed & Telemetry
           </span>
           <span style={{
             fontSize: '11px',
-            fontWeight: 600,
-            backgroundColor: 'var(--bg-hover)',
-            padding: '2px 8px',
-            borderRadius: '12px',
-            color: 'var(--text-secondary)'
+            fontFamily: 'var(--font-mono)',
+            backgroundColor: 'var(--surface-control)',
+            padding: '1px 6px',
+            borderRadius: 'var(--radius-sm)',
+            border: '1px solid var(--border)',
+            color: 'var(--foreground-muted)'
           }}>
             {filteredLogs.length} events
           </span>
         </div>
 
         {/* Filters and Controls */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           {/* Search box */}
           <div style={{
             display: 'flex',
             alignItems: 'center',
             gap: '6px',
-            backgroundColor: 'var(--bg-primary)',
-            border: '1px solid var(--border-color)',
-            borderRadius: '6px',
-            padding: '4px 8px'
+            backgroundColor: 'var(--surface)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius-sm)',
+            padding: '3px 8px'
           }}>
-            <Search size={12} color="var(--text-muted)" />
+            <Search size={12} style={{ color: 'var(--foreground-muted)' }} />
             <input
               type="text"
               placeholder="Filter logs..."
@@ -142,8 +140,8 @@ export const LiveLogViewer: React.FC<LiveLogViewerProps> = ({ logs }) => {
                 outline: 'none',
                 background: 'transparent',
                 fontSize: '12px',
-                color: 'var(--text-primary)',
-                width: '100px'
+                color: 'var(--foreground)',
+                width: '90px'
               }}
             />
           </div>
@@ -152,13 +150,12 @@ export const LiveLogViewer: React.FC<LiveLogViewerProps> = ({ logs }) => {
           <select
             value={filterRole}
             onChange={(e) => setFilterRole(e.target.value)}
+            className="select"
             style={{
               fontSize: '12px',
-              padding: '4px 8px',
-              borderRadius: '6px',
-              border: '1px solid var(--border-color)',
-              backgroundColor: 'var(--bg-primary)',
-              color: 'var(--text-primary)'
+              minHeight: '28px',
+              padding: '2px 6px',
+              width: 'auto'
             }}
           >
             <option value="all">All Agents</option>
@@ -173,35 +170,31 @@ export const LiveLogViewer: React.FC<LiveLogViewerProps> = ({ logs }) => {
           {/* Copy transcript button */}
           <button
             onClick={copyTranscript}
+            className="button-ghost"
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-              fontSize: '12px',
-              padding: '4px 8px',
-              borderRadius: '6px',
-              backgroundColor: 'var(--bg-primary)',
-              border: '1px solid var(--border-color)',
-              color: 'var(--text-secondary)'
+              height: '28px',
+              padding: '0 8px',
+              fontSize: '11px',
+              border: '1px solid var(--border)',
+              backgroundColor: 'var(--surface)'
             }}
             title="Copy Full Transcript"
           >
-            <Copy size={12} />
-            {copied ? 'Copied' : 'Copy'}
+            <Copy size={11} />
+            <span>{copied ? 'Copied' : 'Copy'}</span>
           </button>
 
           {/* Auto scroll toggle */}
           <button
             onClick={() => setAutoScroll(!autoScroll)}
+            className="button-ghost"
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-              fontSize: '12px',
-              padding: '4px 8px',
-              borderRadius: '6px',
-              backgroundColor: autoScroll ? 'var(--accent-subtle)' : 'transparent',
-              color: autoScroll ? 'var(--accent-primary)' : 'var(--text-muted)'
+              width: '28px',
+              height: '28px',
+              padding: 0,
+              border: '1px solid var(--border)',
+              backgroundColor: autoScroll ? 'var(--brand-soft)' : 'var(--surface)',
+              color: autoScroll ? 'var(--brand-dark)' : 'var(--foreground-muted)'
             }}
             title="Toggle Auto-Scroll"
           >
@@ -210,22 +203,22 @@ export const LiveLogViewer: React.FC<LiveLogViewerProps> = ({ logs }) => {
         </div>
       </div>
 
-      {/* Terminal Body */}
+      {/* Terminal Feed Body */}
       <div
         ref={containerRef}
         style={{
           flex: 1,
           overflowY: 'auto',
-          padding: '16px',
+          padding: '12px',
           display: 'flex',
           flexDirection: 'column',
-          gap: '8px',
-          backgroundColor: 'var(--bg-primary)'
+          gap: '6px',
+          backgroundColor: 'var(--background-alternative)'
         }}
       >
         {filteredLogs.length === 0 ? (
-          <div style={{ margin: 'auto', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
-            <Terminal size={28} style={{ opacity: 0.3, margin: '0 auto 8px auto' }} />
+          <div style={{ margin: 'auto', textAlign: 'center', color: 'var(--foreground-muted)', fontSize: '13px' }}>
+            <Terminal size={24} style={{ opacity: 0.3, margin: '0 auto 6px auto' }} />
             Awaiting subagent mission launch...
           </div>
         ) : (
@@ -240,27 +233,27 @@ export const LiveLogViewer: React.FC<LiveLogViewerProps> = ({ logs }) => {
                 style={{
                   display: 'flex',
                   alignItems: 'flex-start',
-                  gap: '12px',
+                  gap: '10px',
                   fontSize: '13px',
                   lineHeight: '1.5',
-                  padding: '10px 14px',
-                  borderRadius: '8px',
-                  backgroundColor: 'var(--bg-secondary)',
-                  border: '1px solid var(--border-color)',
-                  boxShadow: 'var(--shadow-sm)'
+                  padding: '8px 12px',
+                  borderRadius: 'var(--radius-sm)',
+                  backgroundColor: 'var(--surface)',
+                  border: '1px solid var(--border)'
                 }}
               >
                 {/* Agent Tag */}
                 <div style={{
-                  minWidth: '105px',
+                  minWidth: '100px',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '4px'
+                  gap: '3px'
                 }}>
                   <span style={{
                     fontSize: '11px',
                     fontWeight: 700,
                     color: agentColor,
+                    fontFamily: 'var(--font-mono)',
                     textTransform: 'uppercase',
                     letterSpacing: '0.04em'
                   }}>
@@ -272,13 +265,13 @@ export const LiveLogViewer: React.FC<LiveLogViewerProps> = ({ logs }) => {
                     gap: '4px',
                     fontSize: '10px',
                     fontWeight: 600,
-                    padding: '2px 6px',
-                    borderRadius: '4px',
+                    padding: '1px 5px',
+                    borderRadius: 'var(--radius-sm)',
                     backgroundColor: badge.bg,
                     color: badge.color,
                     width: 'fit-content'
                   }}>
-                    <BadgeIcon size={10} />
+                    <BadgeIcon size={9} />
                     {badge.label}
                   </span>
                 </div>
@@ -286,7 +279,7 @@ export const LiveLogViewer: React.FC<LiveLogViewerProps> = ({ logs }) => {
                 {/* Content */}
                 <div style={{
                   flex: 1,
-                  color: 'var(--text-primary)',
+                  color: 'var(--foreground)',
                   wordBreak: 'break-word',
                   fontFamily: log.event_type.includes('tool') ? 'var(--font-mono)' : 'inherit',
                   fontSize: log.event_type.includes('tool') ? '12px' : '13px'

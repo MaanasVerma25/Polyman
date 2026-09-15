@@ -18,6 +18,7 @@ venv/
 .venv/
 *.db
 *.sqlite3
+*.log
 
 # Testing & Cache
 .pytest_cache/
